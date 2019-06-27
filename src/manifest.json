@@ -1,0 +1,11 @@
+{
+  "name": "Android Nine-Patch Export",
+  "id": "W6T1X01tAZMTMW3rk3LFUx",
+  "version": "0.5.0",
+  "html": "ui.html",
+  "menu": [
+    {"name": "New Nine-patch", "command": "new-nine-patch"},
+    {"name": "Export Nine-patch", "command": "export-nine-patch"}
+  ],
+  "script": "code.js"
+}
