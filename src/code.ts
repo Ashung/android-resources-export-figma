@@ -178,71 +178,127 @@ if (command === 'export-nine-patch') {
     if (selectedLayers.length === 1) {
         let asset = selectedLayers[0];
         if (asset.getPluginData('resourceType') === 'nine-patch') {
-            (async() => {
-
-                let patch = (<ChildrenMixin> asset).findOne(node => node.name === 'patch');
-                let content = (<ChildrenMixin> asset).findOne(node => node.name === 'content');
-                if (!patch && !content) return;
-
-                // Create slice
-                let assetName = toAndroidResourceName(asset.name);
-                let contentSlice = figma.createSlice();
-                contentSlice.name = assetName;
-                contentSlice.x = (<LayoutMixin> asset).x + 1;
-                contentSlice.y = (<LayoutMixin> asset).y + 1;
-                contentSlice.resize((<LayoutMixin> asset).width - 2, (<LayoutMixin> asset).height - 2);
-                (<ChildrenMixin> content).appendChild(contentSlice);
-                let exportSettings: ExportSettingsImage [] = [];
-                for (let key in scaleToDpi) {
-                    exportSettings.push({
-                        format: 'PNG',
-                        constraint: {type: 'SCALE', value: Number(key)}
-                    });
-                }
-                contentSlice.exportSettings = exportSettings;
-
-                let patchImageData = await (<ExportMixin> patch).exportAsync();
-                let contentImages = [];
-                for (const item of exportSettings) {
-                    let contentImage = await (<ExportMixin> contentSlice).exportAsync(item);
-                    let scale = item.constraint.value;
-                    contentImages.push({
-                        scale: scale,
-                        width: Math.round(contentSlice.width * scale),
-                        height: Math.round(contentSlice.height * scale),
-                        path: 'drawable-' + scaleToDpi[scale] + '/' + assetName + '.9.png',
-                        imageData: contentImage
-                    });
-                };
-
-                figma.showUI(__html__, {visible: false, width: 400, height: 300});
-
-                figma.ui.postMessage({
-                    type: 'export-nine-patch',
-                    name: assetName,
-                    patchImage: {
-                        width: (<LayoutMixin> patch).width,
-                        height: (<LayoutMixin> patch).height,
-                        imageData: patchImageData
-                    },
-                    contentImages
-                });
-
-                // Remove slice layer and close plugin
-                const postMessage = await new Promise((resolve, reject) => {
-                    figma.ui.onmessage = value => resolve(value);
-                });
-                if (postMessage === 'done') {
-                    contentSlice.remove();
-                    figma.closePlugin();
-                }
-
-            })();
+            Promise.all([exportNinePath(asset)]);
         } else {
             alert('No a Android nine-patch resource.');
+            figma.closePlugin();
         }
     } else {
         alert('Please select 1 nine-patch resource.');
+        figma.closePlugin();
+    }
+}
+
+if (command === 'export-png') {
+    if (selectedLayers.length === 0) {
+        showMessageAndExit('Please select at least 1 slice layer, exportable layer or group include slice.');
+    } else {
+        // Get all exportable layers
+        let exportableLayers: any [] = [];
+        selectedLayers.forEach(layer => {
+            if (layer.type === 'SLICE' || (<ExportMixin> layer).exportSettings.length > 0) {
+                exportableLayers.push(layer);
+            }
+            (<ChildrenMixin> layer).findAll(child => child.type === 'SLICE' || (<ExportMixin> child).exportSettings.length > 0).forEach(item => {
+                exportableLayers.push(item);
+            });
+        });
+        if (exportableLayers.length === 0) {
+            showMessageAndExit('No exportable layers in selection.');
+        } else {
+            Promise.all(exportableLayers.map(layer => getExportImagesFromLayer(layer)))
+            .then(exportImages => {
+                figma.showUI(__html__, {visible: true, width: 240, height: 100});
+                figma.ui.postMessage({
+                    type: 'export-png',
+                    exportImages: exportImages
+                });
+            })
+            .catch(error => {
+                console.error(error);
+                figma.closePlugin();
+            });
+        }
+    }
+}
+
+async function getExportImagesFromLayer(layer: any) {
+    let assetName = toAndroidResourceName(layer.name);
+    let androidExportSettings: ExportSettingsImage [] = [];
+    for (let key in scaleToDpi) {
+        androidExportSettings.push({
+            format: 'PNG',
+            constraint: {type: 'SCALE', value: Number(key)}
+        });
+    }
+    let images = await Promise.all(androidExportSettings.map(async item => {
+        let contentImage = await (<ExportMixin> layer).exportAsync(item);
+        let scale = item.constraint.value;
+        return {
+            width: Math.round(layer.width * scale),
+            height: Math.round(layer.height * scale),
+            path: 'drawable-' + scaleToDpi[scale] + '/' + assetName + '.png',
+            imageData: contentImage
+        };
+    }));
+    return images;
+}
+
+async function exportNinePath(asset: any) {
+    let patch = (<ChildrenMixin> asset).findOne(node => node.name === 'patch');
+    let content = (<ChildrenMixin> asset).findOne(node => node.name === 'content');
+    if (!patch && !content) return;
+
+    // Create slice
+    let assetName = toAndroidResourceName(asset.name);
+    let contentSlice = figma.createSlice();
+    contentSlice.name = assetName;
+    contentSlice.x = (<LayoutMixin> asset).x + 1;
+    contentSlice.y = (<LayoutMixin> asset).y + 1;
+    contentSlice.resize((<LayoutMixin> asset).width - 2, (<LayoutMixin> asset).height - 2);
+    (<ChildrenMixin> content).appendChild(contentSlice);
+    let exportSettings: ExportSettingsImage [] = [];
+    for (let key in scaleToDpi) {
+        exportSettings.push({
+            format: 'PNG',
+            constraint: {type: 'SCALE', value: Number(key)}
+        });
+    }
+    contentSlice.exportSettings = exportSettings;
+
+    let patchImageData = await (<ExportMixin> patch).exportAsync();
+    let contentImages = await Promise.all(exportSettings.map(async item => {
+        let contentImage = await (<ExportMixin> contentSlice).exportAsync(item);
+        let scale = item.constraint.value;
+        return {
+            scale: scale,
+            width: Math.round(contentSlice.width * scale),
+            height: Math.round(contentSlice.height * scale),
+            path: 'drawable-' + scaleToDpi[scale] + '/' + assetName + '.9.png',
+            imageData: contentImage
+        };
+    }));
+
+    figma.showUI(__html__, {visible: true, width: 400, height: 300});
+
+    figma.ui.postMessage({
+        type: 'export-nine-patch',
+        name: assetName,
+        patchImage: {
+            width: (<LayoutMixin> patch).width,
+            height: (<LayoutMixin> patch).height,
+            imageData: patchImageData
+        },
+        contentImages
+    });
+
+    // Remove slice layer and close plugin
+    const postMessage = await new Promise((resolve, reject) => {
+        figma.ui.onmessage = value => resolve(value);
+    });
+    if (postMessage === 'done') {
+        contentSlice.remove();
+        figma.closePlugin();
     }
 }
 
@@ -319,4 +375,16 @@ function toAndroidResourceName(name: string) : string {
     name = name.replace(/\s+/g, "_");
     name = name.toLowerCase();
     return name === '' ? 'untitled' : name;
+}
+
+function showMessageAndExit(msg: string) {
+    figma.showUI(__html__, {visible: true, width: 240, height: 100});
+    figma.ui.postMessage({
+        type: 'show-message',
+        text: msg
+    });
+    const close = () => {
+        figma.closePlugin();
+    };
+    setTimeout(close, 3000);
 }

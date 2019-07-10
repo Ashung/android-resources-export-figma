@@ -1,11 +1,13 @@
 {
-  "name": "Android Nine-Patch Export",
+  "name": "Android Res Export",
   "id": "W6T1X01tAZMTMW3rk3LFUx",
-  "version": "0.5.0",
-  "html": "ui.html",
+  "api": "0.6.0",
+  "main": "code.js",
+  "ui": "ui.html",
   "menu": [
+    {"name": "Export PNG", "command": "export-png"},
+    {"separator": true},
     {"name": "New Nine-patch", "command": "new-nine-patch"},
     {"name": "Export Nine-patch", "command": "export-nine-patch"}
-  ],
-  "script": "code.js"
+  ]
 }
