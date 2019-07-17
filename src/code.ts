@@ -10,11 +10,44 @@ const scaleToDpi = {
     4: 'xxxhdpi'
 };
 
+if (command === 'export-png') {
+    if (selectedLayers.length === 0) {
+        showMessageAndExit('Please select at least 1 slice layer, exportable layer or group include slice.');
+    } else {
+        // Get all exportable layers
+        let exportableLayers: any [] = [];
+        selectedLayers.forEach(layer => {
+            if (layer.type === 'SLICE' || (<ExportMixin> layer).exportSettings.length > 0) {
+                exportableLayers.push(layer);
+            }
+            (<ChildrenMixin> layer).findAll(child => child.type === 'SLICE' || (<ExportMixin> child).exportSettings.length > 0).forEach(item => {
+                exportableLayers.push(item);
+            });
+        });
+        if (exportableLayers.length === 0) {
+            showMessageAndExit('No exportable layers in selection.');
+        } else {
+            Promise.all(exportableLayers.map(layer => getExportImagesFromLayer(layer)))
+            .then(exportImages => {
+                figma.showUI(__html__, {width: 300, height: 150});
+                figma.ui.postMessage({
+                    type: 'export-png',
+                    exportImages: exportImages
+                });
+            })
+            .catch(error => {
+                console.error(error);
+                figma.closePlugin();
+            });
+        }
+    }
+}
+
 if (command === 'new-nine-patch') {
 
     let hasNinePatchInSelectedLayers = selectedLayers.some(node => node.getPluginData('resourceType') === 'nine-patch');
     if (hasNinePatchInSelectedLayers) {
-        alert('Selected layers have a nine-patch resource.');
+        showMessageAndExit('Selected layers have a nine-patch resource.');
     }
     else {
 
@@ -117,8 +150,6 @@ if (command === 'new-nine-patch') {
             traverse(layer);
         });
 
-        // console.log(influenceFrame);
-
         // Group selection
         const lastSelectedLayer =  selectedLayers[selectedLayers.length - 1];
         const parent = lastSelectedLayer.parent;
@@ -175,43 +206,30 @@ if (command === 'new-nine-patch') {
 }
 
 if (command === 'export-nine-patch') {
-    if (selectedLayers.length === 1) {
-        let asset = selectedLayers[0];
-        if (asset.getPluginData('resourceType') === 'nine-patch') {
-            Promise.all([exportNinePath(asset)]);
-        } else {
-            alert('No a Android nine-patch resource.');
-            figma.closePlugin();
-        }
-    } else {
-        alert('Please select 1 nine-patch resource.');
-        figma.closePlugin();
-    }
-}
-
-if (command === 'export-png') {
     if (selectedLayers.length === 0) {
-        showMessageAndExit('Please select at least 1 slice layer, exportable layer or group include slice.');
+        showMessageAndExit('Please select at least 1 nine-patch asset.');
     } else {
-        // Get all exportable layers
-        let exportableLayers: any [] = [];
+        let ninePatchAssets: any [] = [];
         selectedLayers.forEach(layer => {
-            if (layer.type === 'SLICE' || (<ExportMixin> layer).exportSettings.length > 0) {
-                exportableLayers.push(layer);
+            if (
+                layer.type === 'GROUP' &&
+                layer.getPluginData('resourceType') === 'nine-patch' &&
+                (<ChildrenMixin> layer).findOne(child => child.name === 'patch') &&
+                (<ChildrenMixin> layer).findOne(child => child.name === 'content')
+            ) {
+                ninePatchAssets.push(layer);
             }
-            (<ChildrenMixin> layer).findAll(child => child.type === 'SLICE' || (<ExportMixin> child).exportSettings.length > 0).forEach(item => {
-                exportableLayers.push(item);
-            });
         });
-        if (exportableLayers.length === 0) {
-            showMessageAndExit('No exportable layers in selection.');
+        if (ninePatchAssets.length === 0) {
+            showMessageAndExit('No any nine-patch asset in selection.');
         } else {
-            Promise.all(exportableLayers.map(layer => getExportImagesFromLayer(layer)))
-            .then(exportImages => {
-                figma.showUI(__html__, {visible: true, width: 240, height: 100});
+            Promise.all(ninePatchAssets.map(layer => getExportNinePatchFromLayer(layer)))
+            .then(exportNinePatchAssets => {
+                console.log(exportNinePatchAssets)
+                figma.showUI(__html__, {width: 300, height: 150});
                 figma.ui.postMessage({
-                    type: 'export-png',
-                    exportImages: exportImages
+                    type: 'export-nine-patch',
+                    exportImages: exportNinePatchAssets
                 });
             })
             .catch(error => {
@@ -222,7 +240,7 @@ if (command === 'export-png') {
     }
 }
 
-async function getExportImagesFromLayer(layer: any) {
+async function getExportImagesFromLayer(layer: any): Promise<any []> {
     let assetName = toAndroidResourceName(layer.name);
     let androidExportSettings: ExportSettingsImage [] = [];
     for (let key in scaleToDpi) {
@@ -244,18 +262,18 @@ async function getExportImagesFromLayer(layer: any) {
     return images;
 }
 
-async function exportNinePath(asset: any) {
-    let patch = (<ChildrenMixin> asset).findOne(node => node.name === 'patch');
-    let content = (<ChildrenMixin> asset).findOne(node => node.name === 'content');
+async function getExportNinePatchFromLayer(layer: any): Promise<any> {
+    let patch = (<ChildrenMixin> layer).findOne(node => node.name === 'patch');
+    let content = (<ChildrenMixin> layer).findOne(node => node.name === 'content');
     if (!patch && !content) return;
 
     // Create slice
-    let assetName = toAndroidResourceName(asset.name);
+    let assetName = toAndroidResourceName(layer.name);
     let contentSlice = figma.createSlice();
     contentSlice.name = assetName;
-    contentSlice.x = (<LayoutMixin> asset).x + 1;
-    contentSlice.y = (<LayoutMixin> asset).y + 1;
-    contentSlice.resize((<LayoutMixin> asset).width - 2, (<LayoutMixin> asset).height - 2);
+    contentSlice.x = (<LayoutMixin> layer).x + 1;
+    contentSlice.y = (<LayoutMixin> layer).y + 1;
+    contentSlice.resize((<LayoutMixin> layer).width - 2, (<LayoutMixin> layer).height - 2);
     (<ChildrenMixin> content).appendChild(contentSlice);
     let exportSettings: ExportSettingsImage [] = [];
     for (let key in scaleToDpi) {
@@ -279,27 +297,39 @@ async function exportNinePath(asset: any) {
         };
     }));
 
-    figma.showUI(__html__, {visible: true, width: 400, height: 300});
+    contentSlice.remove();
 
-    figma.ui.postMessage({
-        type: 'export-nine-patch',
+    return {
         name: assetName,
         patchImage: {
             width: (<LayoutMixin> patch).width,
             height: (<LayoutMixin> patch).height,
             imageData: patchImageData
         },
-        contentImages
-    });
+        contentImages: contentImages
+    };
 
-    // Remove slice layer and close plugin
-    const postMessage = await new Promise((resolve, reject) => {
-        figma.ui.onmessage = value => resolve(value);
-    });
-    if (postMessage === 'done') {
-        contentSlice.remove();
-        figma.closePlugin();
-    }
+    // figma.showUI(__html__, {visible: true, width: 400, height: 300});
+
+    // figma.ui.postMessage({
+    //     type: 'export-nine-patch',
+    //     name: assetName,
+    //     patchImage: {
+    //         width: (<LayoutMixin> patch).width,
+    //         height: (<LayoutMixin> patch).height,
+    //         imageData: patchImageData
+    //     },
+    //     contentImages
+    // });
+
+    // // Remove slice layer and close plugin
+    // const postMessage = await new Promise((resolve, reject) => {
+    //     figma.ui.onmessage = value => resolve(value);
+    // });
+    // if (postMessage === 'done') {
+    //     contentSlice.remove();
+    //     figma.closePlugin();
+    // }
 }
 
 function toAndroidResourceName(name: string) : string {
@@ -377,11 +407,11 @@ function toAndroidResourceName(name: string) : string {
     return name === '' ? 'untitled' : name;
 }
 
-function showMessageAndExit(msg: string) {
-    figma.showUI(__html__, {visible: true, width: 240, height: 100});
+function showMessageAndExit(message: string) {
+    figma.showUI(__html__, {visible: true, width: 300, height: 120});
     figma.ui.postMessage({
         type: 'show-message',
-        text: msg
+        text: message
     });
     const close = () => {
         figma.closePlugin();
