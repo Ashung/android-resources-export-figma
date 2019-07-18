@@ -3,9 +3,14 @@ import './main.css';
 import './ui.css';
 
 import JSZip from '../node_modules/jszip/dist/jszip.js'; 
+import images from './images.json';
 
 window.onmessage = async (event) => {
     const pluginMessage = event.data.pluginMessage;
+
+    if (!pluginMessage) {
+        return;
+    }
 
     if (pluginMessage && pluginMessage.type === 'show-message') {
         const message = pluginMessage.text;
@@ -35,6 +40,12 @@ window.onmessage = async (event) => {
         downloadZip(assets, name, message);
     }
 
+    if (pluginMessage === 'new-app-icon') {
+        for (let key in images) {
+            images[key] = base64ToUint8Array(images[key]);
+        }
+        window.parent.postMessage({pluginMessage: images}, '*')
+    }
 
 }
 
@@ -219,4 +230,14 @@ function patchLineFromImageData(data: ImageData, side: string, scale: number): I
     }
     const imageData = new ImageData(scaledPatchLineData, width, height);
     return imageData;
+}
+
+function base64ToUint8Array(base64: string): Uint8Array {
+    const binaryString = window.atob(base64);
+    const length = binaryString.length;
+    const bytes = new Uint8Array(length);
+    for (let i = 0; i < length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
 }

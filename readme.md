@@ -1,13 +1,20 @@
-![](android_res_export_figma.png)
+![](android_resources_export_figma.png)
 
-# (WIP) Android Res Export for Figma
+# Android Resources Export
 
-Export Android assets in Figma.
+A Figma plugin to export Android resources.
 
 ## Installation
 
+Still in Beta.
 
 ## Features
 
-- Export PNG asset.
-- Create and export Nine-patch.  
+- Export PNG.
+- Create and export Nine-patch.
+- Create and export app icon.
+- Export vector drawable.
+
+## License
+
+MIT

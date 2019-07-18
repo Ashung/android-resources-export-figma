@@ -1,3 +1,4 @@
+
 let command = figma.command;
 let currentPage = figma.currentPage;
 let selectedLayers = currentPage.selection;
@@ -157,7 +158,7 @@ if (command === 'new-nine-patch') {
         groupContent.name = 'content';
 
         // Create patch lines
-        let blackColorFill: Paint = {type: 'SOLID', color: {r: 0, g: 0, b: 0}};
+        let blackColorFill: SolidPaint = {type: 'SOLID', color: {r: 0, g: 0, b: 0}};
         let leftPatch = figma.createRectangle();
         leftPatch.name = 'left';
         leftPatch.x = influenceFrame[3] - 1;
@@ -237,6 +238,55 @@ if (command === 'export-nine-patch') {
                 figma.closePlugin();
             });
         }
+    }
+}
+
+if (command === 'new-app-icon') {
+    figma.showUI(__html__, {visible: false});
+    figma.ui.postMessage('new-app-icon');
+    figma.ui.onmessage = (images) => {
+        // New page
+        const newPage = figma.createPage();
+        newPage.name = 'app icon';
+
+        // Old 48dp app launcher icon
+        createFrameWithGrid(0, 0, 48, 48, 0, 0, 48, 48, 'ic_launcher', images.old_icon_grid, newPage);
+
+        // 108dp adaptive icon
+        createFrameWithGrid(98, 0, 108, 108, 0, 0, 108, 108, 'ic_background', images.adaptive_icon_grid, newPage);
+        createFrameWithGrid(256, 0, 108, 108, 0, 0, 108, 108, 'ic_foreground', images.adaptive_icon_grid, newPage);
+
+        // Google play icon 512px
+        createFrameWithGrid(414, 0, 512, 512, 64, 64, 384, 384, 'google_play_icon', images.old_icon_grid, newPage);
+
+        figma.closePlugin();
+    };
+
+    function createFrameWithGrid(
+        x1: number, y1: number, width1: number, height1: number,
+        x2: number, y2: number, width2: number, height2: number,
+        name: string,
+        image: Uint8Array,
+        parent: ChildrenMixin
+    ) {
+        const frame = figma.createFrame();
+        frame.name = name;
+        frame.x = x1;
+        frame.y = y1;
+        frame.resize(width1, height1);
+        const grid = figma.createRectangle();
+        grid.name = 'grid';
+        grid.x = x2;
+        grid.y = y2;
+        grid.resize(width2, height2);
+        const paint: ImagePaint = {
+            type: 'IMAGE',
+            scaleMode: 'FILL',
+            imageHash: figma.createImage(image).hash
+        };
+        grid.fills = [paint];
+        frame.appendChild(grid);
+        parent.appendChild(frame);
     }
 }
 

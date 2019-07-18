@@ -3,7 +3,7 @@ declare const figma: PluginAPI
 declare const __html__: string
 
 interface PluginAPI {
-  readonly apiVersion: "0.6.0"
+  readonly apiVersion: "0.7.0"
 
   readonly currentPage: PageNode
 
@@ -140,7 +140,7 @@ interface ManifestJson {
   // Name of the plugin.
   name: string
 
-  // Version of the runtime that the plugin uses, e.g. '0.5.0'.
+  // Version of the runtime that the plugin uses, e.g. '0.7.0'.
   api: string
 
   // The file name that contains the plugin code.

@@ -1,6 +1,9 @@
 {
     "compilerOptions": {
         "target": "es6",
-        "removeComments": true
+        "removeComments": true,
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "esModuleInterop": true
     }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "android_res_export_figma",
+  "name": "android_resources_export_figma",
   "version": "1.0.0",
   "description": "Figma plugin for export Android Resources.",
   "main": "index.js",
