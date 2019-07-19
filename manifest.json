@@ -1,6 +1,6 @@
 {
   "name": "Android Resources Export",
-  "id": "W6T1X01tAZMTMW3rk3LFUx",
+  "id": "735452896889481850",
   "api": "0.6.0",
   "main": "dist/code.js",
   "ui": "dist/ui.html",
@@ -10,6 +10,7 @@
     {"name": "New Nine-patch", "command": "new-nine-patch"},
     {"name": "Export Nine-patch", "command": "export-nine-patch"},
     {"separator": true},
-    {"name": "New App Icon", "command": "new-app-icon"}
+    {"name": "New App Icon", "command": "new-app-icon"},
+    {"name": "Export App Icon", "command": "export-app-icon"}
   ]
 }

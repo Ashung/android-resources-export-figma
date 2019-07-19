@@ -1,8 +1,6 @@
-
-import './main.css';
 import './ui.css';
 
-import JSZip from '../node_modules/jszip/dist/jszip.js'; 
+import JSZip from '../node_modules/jszip'; 
 import images from './images.json';
 
 window.onmessage = async (event) => {
@@ -12,34 +10,43 @@ window.onmessage = async (event) => {
         return;
     }
 
-    if (pluginMessage && pluginMessage.type === 'show-message') {
+    if (pluginMessage.type === 'show-message') {
         const message = pluginMessage.text;
-        const text = document.createElement('p');
-        text.className = 'type type--12-pos-medium message';
+        const tip = document.createElement('div');
+        tip.className = 'onboarding-tip';
+        const tipIcon = document.createElement('div');
+        tipIcon.className = 'onboarding-tip__icon';
+        const icon = document.createElement('div');
+        icon.className = 'icon icon--plugin';
+        const text = document.createElement('div'); 
+        text.className = 'onboarding-tip__msg';
         text.textContent = message;
-        document.getElementById('content').appendChild(text);
+        tipIcon.appendChild(icon);
+        tip.appendChild(tipIcon);
+        tip.appendChild(text);
+        const contentDiv = document.getElementById('content');
+        const appDiv = document.getElementById('app');
+        contentDiv.appendChild(tip);
+        appDiv.className += ' session__message';
     }
 
     // Export PNG
-    if (pluginMessage && pluginMessage.type === 'export-png') {
+    if (pluginMessage.type === 'export-png') {
         const name: string = pluginMessage.exportImages.length > 1 ? 'assets' : pluginMessage.exportImages[0][0].path.match(/.*\/(.*)\.png/)[1];
         const assets = await getPNGAssetsFromPluginMessage(pluginMessage);
-        const message: string = 'Click "Save" button to export ' + pluginMessage.exportImages.length + ' PNG asset'
-            + (pluginMessage.exportImages.length > 1 ? 's' : '')
-            + '.';
-        downloadZip(assets, name, message);
+        createAssetsPreview(assets);
+        showDownloadButton(assets, name);
     }
 
     // Export nine-patch
-    if (pluginMessage && pluginMessage.type === 'export-nine-patch') {
+    if (pluginMessage.type === 'export-nine-patch') {
         const name: string = pluginMessage.exportImages.length > 1 ? 'assets' : pluginMessage.exportImages[0].name.replace(/\.png$/);
         const assets = await getNinePatchAssetsFromPluginMessage(pluginMessage);
-        const message: string = 'Click "Save" button to export ' + pluginMessage.exportImages.length + ' nine-patch asset'
-            + (pluginMessage.exportImages.length > 1 ? 's' : '')
-            + '.';
-        downloadZip(assets, name, message);
+        createAssetsPreview(assets);
+        showDownloadButton(assets, name);
     }
 
+    // New app icon
     if (pluginMessage === 'new-app-icon') {
         for (let key in images) {
             images[key] = base64ToUint8Array(images[key]);
@@ -47,28 +54,106 @@ window.onmessage = async (event) => {
         window.parent.postMessage({pluginMessage: images}, '*')
     }
 
+    // Export app icon
+    if (pluginMessage.type === 'export-app-icon') {
+        const assets = await getPNGAssetsFromPluginMessage(pluginMessage);
+
+        // Adaptive icon XML 
+        const xml = '<?xml version="1.0" encoding="utf-8"?>\n' +
+            '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n' +
+            '    <background android:drawable="@mipmap/ic_launcher_background" />\n' +
+            '    <foreground android:drawable="@mipmap/ic_launcher_foreground" />\n' +
+            '</adaptive-icon>'
+        assets.push({
+            path: 'mipmap-v26/ic_launcher.xml',
+            text: xml
+        });
+        
+        // Icon preview
+        const oldIcon = assets.find(item => item.path === 'mipmap-xxxhdpi/ic_launcher.png');
+        const adaptiveIconBackground = assets.find(item => item.path === 'mipmap-xxxhdpi/ic_background.png');
+        const adaptiveIconForeground = assets.find(item => item.path === 'mipmap-xxxhdpi/ic_foreground.png');
+        const playStoreIcon = assets.find(item => item.path === 'playstore_icon.png');
+        const contentDiv = document.getElementById('content');
+
+        const item1 = document.createElement('div');
+        item1.className = 'thumb';
+        const img1 = document.createElement('div');
+        img1.className = 'thumb__img thumb__img--old-app-icon';
+        img1.style.backgroundImage = 'url("' + oldIcon.base64 + '")';
+        const text1 = document.createElement('div');
+        text1.className = 'type type--11-pos thumb__txt';
+        text1.textContent = 'Normal Icon';
+        item1.appendChild(img1);
+        item1.appendChild(text1);
+        contentDiv.appendChild(item1);
+
+        const item2 = document.createElement('div');
+        item2.className = 'thumb';
+        const img2 = document.createElement('div');
+        img2.className = 'thumb__img thumb__img--app-icon-adaptive';
+        img2.style.backgroundImage = 'url("' + adaptiveIconForeground.base64 + '"),url("' + adaptiveIconBackground.base64 + '")';
+        const text2 = document.createElement('div');
+        text2.className = 'type type--11-pos thumb__txt';
+        text2.textContent = 'Adaptive Icon';
+        item2.appendChild(img2);
+        item2.appendChild(text2);
+        contentDiv.appendChild(item2);
+
+        if (playStoreIcon) {
+            const item3 = document.createElement('div');
+            item3.className = 'thumb';
+            const img3 = document.createElement('div');
+            img3.className = 'thumb__img thumb__img--app-icon-playstore';
+            img3.style.backgroundImage = 'url("' + playStoreIcon.base64 + '")';
+            const text3 = document.createElement('div');
+            text3.className = 'type type--11-pos thumb__txt';
+            text3.innerText = 'Play Store Icon';
+            item3.appendChild(img3);
+            item3.appendChild(text3);
+            contentDiv.appendChild(item3);
+        }
+
+        // Download button
+        showDownloadButton(assets, 'launcher_icon');
+    }
+}
+
+function createAssetsPreview(assets: any []) {
+    const contentDiv = document.getElementById('content');
+    assets.forEach(item => {
+        if (/^drawable-xxxhdpi/.test(item.path)) {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'thumb';
+            const image = document.createElement('div');
+            image.className = 'thumb__img';
+            image.style.backgroundImage = 'url("' + item.base64 + '")';
+            const text = document.createElement('div');
+            text.className = 'type type--11-pos thumb__txt';
+            const name = item.path.replace(/^drawable-xxxhdpi\//, '').replace(/\.png$/, '');
+            text.textContent = name;
+            itemDiv.appendChild(image);
+            itemDiv.appendChild(text);
+            contentDiv.appendChild(itemDiv);
+        }
+    });
 }
 
 async function getPNGAssetsFromPluginMessage(pluginMessage: any): Promise<any []> {
     let assets: any [] = [];
     for (const exportImage of pluginMessage.exportImages) {
         for (const item of exportImage) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = item.width;
-            canvas.height = item.height;
-            const imageData = await figmaImageDataToHTMLImageData(item.imageData);
-            ctx.putImageData(imageData, 0, 0);
+            const canvas = await figmaImageDataToCanvas(item.imageData);
             assets.push({
                 path: item.path,
-                blob: await canvasToBlob(canvas)
+                base64: canvasToBase64(canvas)
             });
         }
     }
     return assets;
 }
 
-async function figmaImageDataToHTMLImageData(data: Uint8Array): Promise<ImageData> {
+async function figmaImageDataToCanvas(data: Uint8Array): Promise<HTMLCanvasElement> {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const url = URL.createObjectURL(new Blob([data]));
@@ -81,48 +166,37 @@ async function figmaImageDataToHTMLImageData(data: Uint8Array): Promise<ImageDat
     canvas.width = image.width;
     canvas.height = image.height;
     ctx.drawImage(image, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    return imageData;
+    return canvas;
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
-    return new Promise((resolve, reject) => {
-        canvas.toBlob((blob: Blob) => {
-            resolve(blob);
-        }, 'image/png', 1);
-    })
+function canvasToImageData(canvas: HTMLCanvasElement): ImageData {
+    const ctx = canvas.getContext('2d');
+    return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-// @returns Array [{path: string, blob: Blob}]
-function downloadZip(assets: any [], name: string, message: string): Promise<null> {
+function canvasToBase64(canvas: HTMLCanvasElement): string {
+    return canvas.toDataURL('image/png');
+}
+
+/**
+ * @param  {any[]} assets [{path: string, blob: Blob, text: string}]
+ * @param  {string} name
+ * @returns Promise
+ */
+function showDownloadButton(assets: any [], name: string): Promise<null> {
     return new Promise((resolve, reject) => {
         let zip = new JSZip();
         for (let file of assets) {
-            zip.file(file.path, file.blob, {binary: true});
+            if (file.blob) {
+                zip.file(file.path, file.blob, {binary: true});
+            } else if (file.base64) {
+                zip.file(file.path, file.base64.replace('data:image/png;base64,', ''), {base64: true});
+            } else if (file.text) {
+                zip.file(file.path, file.text);
+            }
         }
         zip.generateAsync({type: 'blob'})
         .then((content: Blob) => {
-
-            // Use auto-download will make Figma crash.
-
-            // const blobURL = window.URL.createObjectURL(content);
-            // const link = document.createElement('a');
-            // link.href = blobURL;
-            // link.style.display = 'none';
-            // link.setAttribute('download', name + '.zip');
-            // if (typeof link.download === 'undefined') {
-            //     link.setAttribute('target', '_blank');
-            // }
-            // document.body.appendChild(link);
-            // link.click();
-            // document.body.removeChild(link);
-            // window.URL.revokeObjectURL(blobURL);
-
-            const text = document.createElement('p');
-            text.className = 'type type--12-pos-medium message';
-            text.textContent = message;
-            document.getElementById('content').appendChild(text);
-
             const blobURL = window.URL.createObjectURL(content);
             const link = document.createElement('a');
             link.className = 'button button--primary';
@@ -130,7 +204,6 @@ function downloadZip(assets: any [], name: string, message: string): Promise<nul
             link.text = 'Save';
             link.setAttribute('download', name + '.zip');
             document.getElementById('footer').appendChild(link);
-
             resolve();
         });
     });
@@ -146,8 +219,10 @@ async function getNinePatchAssetsFromPluginMessage(pluginMessage: any): Promise<
             const ctx = canvas.getContext('2d');
             canvas.width = contentImage.width + 2;
             canvas.height = contentImage.height + 2;
-            const patchData = await figmaImageDataToHTMLImageData(ninePatchImage.patchImage.imageData);
-            const contentData = await figmaImageDataToHTMLImageData(contentImage.imageData);
+            const patchCanvas = await figmaImageDataToCanvas(ninePatchImage.patchImage.imageData);
+            const contentCanvas = await figmaImageDataToCanvas(contentImage.imageData);
+            const patchData = canvasToImageData(patchCanvas);
+            const contentData = canvasToImageData(contentCanvas);
             // Top
             const topPatchData = patchLineFromImageData(patchData, 'top', contentImage.scale);
             ctx.putImageData(topPatchData, 1, 0);
@@ -164,7 +239,7 @@ async function getNinePatchAssetsFromPluginMessage(pluginMessage: any): Promise<
             ctx.putImageData(contentData, 1, 1);
             assets.push({
                 path: contentImage.path,
-                blob: await canvasToBlob(canvas)
+                base64: canvasToBase64(canvas)
             });
         }
     }
