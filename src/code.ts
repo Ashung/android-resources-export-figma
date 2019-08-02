@@ -55,168 +55,171 @@ if (command === 'export-png') {
 }
 
 if (command === 'new-nine-patch') {
-    let hasNinePatchInSelectedLayers = selectedLayers.some(node => node.getPluginData('resourceType') === 'nine-patch');
-    if (hasNinePatchInSelectedLayers) {
-        showMessageAndExit('Selected layers have a nine-patch resource.');
-    }
-    else {
-        if (selectedLayers.length === 1 && isMatchNinePatchLayerStructure(selectedLayers[0])) {
-            const group = selectedLayers[0];
-            group.setPluginData('resourceType', 'nine-patch');
-        } else {
-            // Get influence frame [top, right, bottom, left]
-            let influenceFrame: number[] = [Infinity, -Infinity, -Infinity, Infinity];
+    if (selectedLayers.length === 0) {
+        showMessageAndExit('Please select at least 1 layer.');
+    } else {
+        let hasNinePatchInSelectedLayers = selectedLayers.some(node => node.getPluginData('resourceType') === 'nine-patch');
+        if (hasNinePatchInSelectedLayers) {
+            showMessageAndExit('Selected layers have a nine-patch resource.');
+        }
+        else {
+            if (selectedLayers.length === 1 && isMatchNinePatchLayerStructure(selectedLayers[0])) {
+                const group = selectedLayers[0];
+                group.setPluginData('resourceType', 'nine-patch');
+            } else {
+                // Get influence frame [top, right, bottom, left]
+                let influenceFrame: number[] = [Infinity, -Infinity, -Infinity, Infinity];
 
-            function traverse(node) {
-                processLayer(node);
-                if ("children" in node) {
-                    if (node.type !== "INSTANCE") {
-                        for (const child of node.children) {
-                            traverse(child)
+                function traverse(node) {
+                    processLayer(node);
+                    if ("children" in node) {
+                        if (node.type !== "INSTANCE") {
+                            for (const child of node.children) {
+                                traverse(child)
+                            }
                         }
                     }
                 }
-            }
 
-            function processLayer(layer: LayoutMixin | BlendMixin) {
-                const rotation = (<LayoutMixin> layer).rotation;
-                const x = (<LayoutMixin> layer).x;
-                const y = (<LayoutMixin> layer).y;
-                const width = (<LayoutMixin> layer).width;
-                const height = (<LayoutMixin> layer).height;
-                const pi = Math.PI;
-                let top: number;
-                let right: number;
-                let bottom: number;
-                let left: number;
+                function processLayer(layer: LayoutMixin | BlendMixin) {
+                    const rotation = (<LayoutMixin> layer).rotation;
+                    const x = (<LayoutMixin> layer).x;
+                    const y = (<LayoutMixin> layer).y;
+                    const width = (<LayoutMixin> layer).width;
+                    const height = (<LayoutMixin> layer).height;
+                    const pi = Math.PI;
+                    let top: number;
+                    let right: number;
+                    let bottom: number;
+                    let left: number;
 
-                if (rotation < 0) {
-                    top = y;
-                    right = x + Math.cos(rotation * pi / 180) * width;
-                    bottom = y + Math.cos(-rotation * pi / 180) * height + Math.sin(-rotation * pi / 180) * width;
-                    left = x - Math.sin(-rotation * pi / 180) * height;
-                } else {
-                    top = y - Math.sin(rotation * pi / 180) * width;
-                    right = x + Math.cos(rotation * pi / 180) * width + Math.sin(rotation * pi / 180) * height;
-                    bottom = y + Math.cos(rotation * pi / 180) * height;
-                    left = x;
+                    if (rotation < 0) {
+                        top = y;
+                        right = x + Math.cos(rotation * pi / 180) * width;
+                        bottom = y + Math.cos(-rotation * pi / 180) * height + Math.sin(-rotation * pi / 180) * width;
+                        left = x - Math.sin(-rotation * pi / 180) * height;
+                    } else {
+                        top = y - Math.sin(rotation * pi / 180) * width;
+                        right = x + Math.cos(rotation * pi / 180) * width + Math.sin(rotation * pi / 180) * height;
+                        bottom = y + Math.cos(rotation * pi / 180) * height;
+                        left = x;
+                    }
+
+                    // Effects
+                    if ((<BlendMixin> layer).effects) {
+                        (<BlendMixin> layer).effects.forEach(effect => {
+                            if (effect.type === 'DROP_SHADOW' && effect.visible === true) {
+                                let xOffset = effect.offset.x;
+                                let yOffset = effect.offset.y;
+                                const blurRadius = effect.radius;
+                                let shadowFrame: number[] = [top, right, bottom, left];
+                                if (xOffset > 0) {
+                                    shadowFrame[1] += xOffset;
+                                } else {
+                                    shadowFrame[3] += xOffset;
+                                }
+                                if (yOffset > 0) {
+                                    shadowFrame[2] += yOffset;
+                                } else {
+                                    shadowFrame[0] += yOffset;
+                                }
+                                if (blurRadius > 0) {
+                                    if (yOffset < blurRadius) {
+                                        shadowFrame[0] -= blurRadius;
+                                    }
+                                    if (xOffset > -blurRadius) {
+                                        shadowFrame[1] += blurRadius;
+                                    }
+                                    if (yOffset > -blurRadius) {
+                                        shadowFrame[2] += blurRadius;
+                                    }
+                                    if (xOffset < blurRadius) {
+                                        shadowFrame[3] -= blurRadius;
+                                    }
+                                }
+                                top = Math.min(shadowFrame[0], top);
+                                right = Math.max(shadowFrame[1], right);
+                                bottom = Math.max(shadowFrame[2], bottom);
+                                left = Math.min(shadowFrame[3], left);
+                            }
+                            if (effect.type === 'LAYER_BLUR' && effect.visible === true) {
+                                const radius = effect.radius;
+                                top -= radius;
+                                right += radius;
+                                bottom += radius;
+                                left -= radius;
+                            }
+                        });
+                    }
+
+                    influenceFrame[0] = Math.min(influenceFrame[0], top);
+                    influenceFrame[1] = Math.max(influenceFrame[1], right);
+                    influenceFrame[2] = Math.max(influenceFrame[2], bottom);
+                    influenceFrame[3] = Math.min(influenceFrame[3], left);
+                    influenceFrame[0] = Math.floor(influenceFrame[0]);
+                    influenceFrame[1] = Math.ceil(influenceFrame[1]);
+                    influenceFrame[2] = Math.ceil(influenceFrame[2]);
+                    influenceFrame[3] = Math.floor(influenceFrame[3]);
                 }
 
-                // Effects
-                if ((<BlendMixin> layer).effects) {
-                    (<BlendMixin> layer).effects.forEach(effect => {
-                        if (effect.type === 'DROP_SHADOW' && effect.visible === true) {
-                            let xOffset = effect.offset.x;
-                            let yOffset = effect.offset.y;
-                            const blurRadius = effect.radius;
-                            let shadowFrame: number[] = [top, right, bottom, left];
-                            if (xOffset > 0) {
-                                shadowFrame[1] += xOffset;
-                            } else {
-                                shadowFrame[3] += xOffset;
-                            }
-                            if (yOffset > 0) {
-                                shadowFrame[2] += yOffset;
-                            } else {
-                                shadowFrame[0] += yOffset;
-                            }
-                            if (blurRadius > 0) {
-                                if (yOffset < blurRadius) {
-                                    shadowFrame[0] -= blurRadius;
-                                }
-                                if (xOffset > -blurRadius) {
-                                    shadowFrame[1] += blurRadius;
-                                }
-                                if (yOffset > -blurRadius) {
-                                    shadowFrame[2] += blurRadius;
-                                }
-                                if (xOffset < blurRadius) {
-                                    shadowFrame[3] -= blurRadius;
-                                }
-                            }
-                            top = Math.min(shadowFrame[0], top);
-                            right = Math.max(shadowFrame[1], right);
-                            bottom = Math.max(shadowFrame[2], bottom);
-                            left = Math.min(shadowFrame[3], left);
-                        }
-                        if (effect.type === 'LAYER_BLUR' && effect.visible === true) {
-                            const radius = effect.radius;
-                            top -= radius;
-                            right += radius;
-                            bottom += radius;
-                            left -= radius;
-                        }
-                    });
-                }
+                selectedLayers.forEach(layer => {
+                    traverse(layer);
+                });
 
-                influenceFrame[0] = Math.min(influenceFrame[0], top);
-                influenceFrame[1] = Math.max(influenceFrame[1], right);
-                influenceFrame[2] = Math.max(influenceFrame[2], bottom);
-                influenceFrame[3] = Math.min(influenceFrame[3], left);
-                influenceFrame[0] = Math.floor(influenceFrame[0]);
-                influenceFrame[1] = Math.ceil(influenceFrame[1]);
-                influenceFrame[2] = Math.ceil(influenceFrame[2]);
-                influenceFrame[3] = Math.floor(influenceFrame[3]);
+                // Group selection
+                const lastSelectedLayer = selectedLayers[selectedLayers.length - 1];
+                const parent = lastSelectedLayer.parent;
+                let groupContent = figma.group(selectedLayers, parent, parent.children.indexOf(lastSelectedLayer));
+                groupContent.name = 'content';
+
+                // Create patch lines
+                let blackColorFill: SolidPaint = {type: 'SOLID', color: {r: 0, g: 0, b: 0}};
+                let leftPatch = figma.createRectangle();
+                leftPatch.name = 'left';
+                leftPatch.x = influenceFrame[3] - 1;
+                leftPatch.y = influenceFrame[0];
+                leftPatch.resize(1, influenceFrame[2] - influenceFrame[0]);
+                leftPatch.fills = [blackColorFill];
+
+                let topPatch = figma.createRectangle();
+                topPatch.name = 'top';
+                topPatch.x = influenceFrame[3];
+                topPatch.y = influenceFrame[0] - 1;
+                topPatch.resize(influenceFrame[1] - influenceFrame[3], 1);
+                topPatch.fills = [blackColorFill];
+
+                let rightPatch = figma.createRectangle();
+                rightPatch.name = 'right';
+                rightPatch.x = influenceFrame[1];
+                rightPatch.y = influenceFrame[0];
+                rightPatch.resize(1, influenceFrame[2] - influenceFrame[0]);
+                rightPatch.fills = [blackColorFill];
+
+                let bottomPath = figma.createRectangle();
+                bottomPath.name = 'bottom';
+                bottomPath.x = influenceFrame[3];
+                bottomPath.y = influenceFrame[2];
+                bottomPath.resize(influenceFrame[1] - influenceFrame[3], 1);
+                bottomPath.fills = [blackColorFill];
+
+                let groupPathIndex = groupContent.parent.children.indexOf(groupContent) + 1;
+                let groupPatch = figma.group([leftPatch, topPatch, rightPatch, bottomPath], groupContent.parent, groupPathIndex);
+                groupPatch.name = 'patch';
+                groupPatch.x = influenceFrame[3] - 1;
+                groupPatch.y = influenceFrame[0] - 1;
+
+                // Group all
+                let groupAllIndex = groupPatch.parent.children.indexOf(groupPatch) + 1;
+                let groupAll = figma.group([groupContent, groupPatch], groupPatch.parent, groupAllIndex);
+                groupAll.name = toAndroidResourceName(lastSelectedLayer.name);
+                figma.currentPage.selection = [groupAll];
+
+                // Set plugin data
+                groupAll.setPluginData('resourceType', 'nine-patch');
             }
-
-            selectedLayers.forEach(layer => {
-                traverse(layer);
-            });
-
-            // Group selection
-            const lastSelectedLayer = selectedLayers[selectedLayers.length - 1];
-            const parent = lastSelectedLayer.parent;
-            let groupContent = figma.group(selectedLayers, parent, parent.children.indexOf(lastSelectedLayer));
-            groupContent.name = 'content';
-
-            // Create patch lines
-            let blackColorFill: SolidPaint = {type: 'SOLID', color: {r: 0, g: 0, b: 0}};
-            let leftPatch = figma.createRectangle();
-            leftPatch.name = 'left';
-            leftPatch.x = influenceFrame[3] - 1;
-            leftPatch.y = influenceFrame[0];
-            leftPatch.resize(1, influenceFrame[2] - influenceFrame[0]);
-            leftPatch.fills = [blackColorFill];
-
-            let topPatch = figma.createRectangle();
-            topPatch.name = 'top';
-            topPatch.x = influenceFrame[3];
-            topPatch.y = influenceFrame[0] - 1;
-            topPatch.resize(influenceFrame[1] - influenceFrame[3], 1);
-            topPatch.fills = [blackColorFill];
-
-            let rightPatch = figma.createRectangle();
-            rightPatch.name = 'right';
-            rightPatch.x = influenceFrame[1];
-            rightPatch.y = influenceFrame[0];
-            rightPatch.resize(1, influenceFrame[2] - influenceFrame[0]);
-            rightPatch.fills = [blackColorFill];
-
-            let bottomPath = figma.createRectangle();
-            bottomPath.name = 'bottom';
-            bottomPath.x = influenceFrame[3];
-            bottomPath.y = influenceFrame[2];
-            bottomPath.resize(influenceFrame[1] - influenceFrame[3], 1);
-            bottomPath.fills = [blackColorFill];
-
-            let groupPathIndex = groupContent.parent.children.indexOf(groupContent) + 1;
-            let groupPatch = figma.group([leftPatch, topPatch, rightPatch, bottomPath], groupContent.parent, groupPathIndex);
-            groupPatch.name = 'patch';
-            groupPatch.x = influenceFrame[3] - 1;
-            groupPatch.y = influenceFrame[0] - 1;
-
-            // Group all
-            let groupAllIndex = groupPatch.parent.children.indexOf(groupPatch) + 1;
-            let groupAll = figma.group([groupContent, groupPatch], groupPatch.parent, groupAllIndex);
-            groupAll.name = toAndroidResourceName(lastSelectedLayer.name);
-            figma.currentPage.selection = [groupAll];
-
-            // Set plugin data
-            groupAll.setPluginData('resourceType', 'nine-patch');
         }
+        figma.closePlugin();
     }
-
-    figma.closePlugin();
 }
 
 if (command === 'export-nine-patch') {
