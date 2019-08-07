@@ -21,7 +21,7 @@ const exportOptionsForIcon = [
 
 if (command === 'export-png') {
     if (selectedLayers.length === 0) {
-        showMessageAndExit('Please select at least 1 slice layer, exportable layer or group include slice.');
+        figma.closePlugin('Please select at least 1 slice layer, exportable layer or group include slice.');
     } else {
         // Get all exportable layers
         let exportableLayers: any [] = [];
@@ -36,7 +36,7 @@ if (command === 'export-png') {
             }
         });
         if (exportableLayers.length === 0) {
-            showMessageAndExit('No exportable layers in selection.');
+            figma.closePlugin('No exportable layers in selection.');
         } else {
             Promise.all(exportableLayers.map(layer => getExportImagesFromLayer(layer, exportOptions)))
                 .then(exportImages => {
@@ -56,11 +56,11 @@ if (command === 'export-png') {
 
 if (command === 'new-nine-patch') {
     if (selectedLayers.length === 0) {
-        showMessageAndExit('Please select at least 1 layer.');
+        figma.closePlugin('Please select at least 1 layer.');
     } else {
         let hasNinePatchInSelectedLayers = selectedLayers.some(node => node.getPluginData('resourceType') === 'nine-patch');
         if (hasNinePatchInSelectedLayers) {
-            showMessageAndExit('Selected layers have a nine-patch resource.');
+            figma.closePlugin('Selected layers have a nine-patch resource.');
         }
         else {
             if (selectedLayers.length === 1 && isMatchNinePatchLayerStructure(selectedLayers[0])) {
@@ -224,7 +224,7 @@ if (command === 'new-nine-patch') {
 
 if (command === 'export-nine-patch') {
     if (selectedLayers.length === 0) {
-        showMessageAndExit('Please select at least 1 nine-patch asset.');
+        figma.closePlugin('Please select at least 1 nine-patch asset.');
     } else {
         let ninePatchAssets: any [] = [];
         selectedLayers.forEach(layer => {
@@ -236,7 +236,7 @@ if (command === 'export-nine-patch') {
             }
         });
         if (ninePatchAssets.length === 0) {
-            showMessageAndExit('No any nine-patch asset in selection.');
+            figma.closePlugin('No any nine-patch asset in selection.');
         } else {
             Promise.all(ninePatchAssets.map(layer => getExportNinePatchFromLayer(layer, exportOptions)))
                 .then(exportNinePatchAssets => {
@@ -261,6 +261,7 @@ if (command === 'new-app-icon') {
         // New page
         const newPage = figma.createPage();
         newPage.name = 'app icon';
+        figma.currentPage = newPage;
 
         // Old 48dp app launcher icon
         createFrameWithGrid(0, 0, 48, 48, 0, 0, 48, 48, 'ic_launcher', images.old_icon_grid, newPage, false);
@@ -356,7 +357,7 @@ if (command === 'export-app-icon') {
         if (!adaptiveIconForeground) {
             missFrames.push('ic_foreground');
         }
-        showMessageAndExit('Can\'t find the frame named "' + missFrames.join(', ') + '".');
+        figma.closePlugin('Can\'t find the frame named "' + missFrames.join(', ') + '".');
     }
 }
 
@@ -515,16 +516,4 @@ function toAndroidResourceName(name: string) : string {
     name = name.replace(/\s+/g, "_");
     name = name.toLowerCase();
     return name === '' ? 'untitled' : name;
-}
-
-function showMessageAndExit(message: string) {
-    figma.showUI(__html__, {visible: true, width: 400, height: 100});
-    figma.ui.postMessage({
-        type: 'show-message',
-        text: message
-    });
-    const close = () => {
-        // figma.closePlugin();
-    };
-    setTimeout(close, 3000);
 }

@@ -1,7 +1,7 @@
 {
   "name": "Android Resources Export",
   "id": "735452896889481850",
-  "api": "0.6.0",
+  "api": "1.0.0",
   "main": "dist/code.js",
   "ui": "dist/ui.html",
   "menu": [
