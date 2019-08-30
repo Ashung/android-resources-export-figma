@@ -21,13 +21,13 @@
     "jszip": "^3.2.2"
   },
   "devDependencies": {
-    "css-loader": "^3.0.0",
+    "css-loader": "^3.2.0",
     "html-webpack-inline-source-plugin": "0.0.10",
     "html-webpack-plugin": "^3.2.0",
-    "style-loader": "^0.23.1",
+    "style-loader": "^1.0.0",
     "ts-loader": "^6.0.4",
-    "typescript": "^3.5.3",
-    "webpack": "^4.35.3",
+    "typescript": "^3.6.2",
+    "webpack": "^4.39.3",
     "webpack-cli": "^3.3.6"
   }
 }

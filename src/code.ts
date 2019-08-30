@@ -267,8 +267,8 @@ if (command === 'new-app-icon') {
         createFrameWithGrid(0, 0, 48, 48, 0, 0, 48, 48, 'ic_launcher', images.old_icon_grid, newPage, false);
 
         // 108dp adaptive icon
-        createFrameWithGrid(98, 0, 108, 108, 0, 0, 108, 108, 'ic_background', images.adaptive_icon_grid, newPage, true);
-        createFrameWithGrid(256, 0, 108, 108, 0, 0, 108, 108, 'ic_foreground', images.adaptive_icon_grid, newPage, false);
+        createFrameWithGrid(98, 0, 108, 108, 0, 0, 108, 108, 'ic_launcher_background', images.adaptive_icon_grid, newPage, true);
+        createFrameWithGrid(256, 0, 108, 108, 0, 0, 108, 108, 'ic_launcher_foreground', images.adaptive_icon_grid, newPage, false);
 
         // Google play icon 512px
         createFrameWithGrid(414, 0, 512, 512, 64, 64, 384, 384, 'playstore_icon', images.old_icon_grid, newPage, true);
@@ -316,8 +316,8 @@ if (command === 'export-app-icon') {
     let playStoreIcon: BaseNode;
     figma.root.children.forEach((page: BaseNode) => {
         const oldIconInPage = (<ChildrenMixin>page).findOne(frame => frame.type === 'FRAME' && frame.name === 'ic_launcher');
-        const adaptiveIconBackgroundInPage = (<ChildrenMixin>page).findOne(frame => frame.type === 'FRAME' && frame.name === 'ic_background');
-        const adaptiveIconForegroundInPage = (<ChildrenMixin>page).findOne(frame => frame.type === 'FRAME' && frame.name === 'ic_foreground');
+        const adaptiveIconBackgroundInPage = (<ChildrenMixin>page).findOne(frame => frame.type === 'FRAME' && frame.name === 'ic_launcher_background');
+        const adaptiveIconForegroundInPage = (<ChildrenMixin>page).findOne(frame => frame.type === 'FRAME' && frame.name === 'ic_launcher_foreground');
         const playStoreIconInPage = (<ChildrenMixin>page).findOne(frame => frame.type === 'FRAME' && frame.name === 'playstore_icon');
         if (oldIconInPage && adaptiveIconBackgroundInPage && adaptiveIconForegroundInPage) {
             oldIcon = oldIconInPage;
@@ -352,10 +352,10 @@ if (command === 'export-app-icon') {
             missFrames.push('ic_launcher');
         }
         if (!adaptiveIconBackground) {
-            missFrames.push('ic_background');
+            missFrames.push('ic_launcher_background');
         }
         if (!adaptiveIconForeground) {
-            missFrames.push('ic_foreground');
+            missFrames.push('ic_launcher_foreground');
         }
         figma.closePlugin('Can\'t find the frame named "' + missFrames.join(', ') + '".');
     }

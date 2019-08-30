@@ -71,8 +71,8 @@ window.onmessage = async (event) => {
         
         // Icon preview
         const oldIcon = assets.find(item => item.path === 'mipmap-xxxhdpi/ic_launcher.png');
-        const adaptiveIconBackground = assets.find(item => item.path === 'mipmap-xxxhdpi/ic_background.png');
-        const adaptiveIconForeground = assets.find(item => item.path === 'mipmap-xxxhdpi/ic_foreground.png');
+        const adaptiveIconBackground = assets.find(item => item.path === 'mipmap-xxxhdpi/ic_launcher_background.png');
+        const adaptiveIconForeground = assets.find(item => item.path === 'mipmap-xxxhdpi/ic_launcher_foreground.png');
         const playStoreIcon = assets.find(item => item.path === 'playstore_icon.png');
         const contentDiv = document.getElementById('content');
 
