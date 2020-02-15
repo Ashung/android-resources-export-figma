@@ -12,5 +12,8 @@
     {"separator": true},
     {"name": "New App Icon", "command": "new-app-icon"},
     {"name": "Export App Icon", "command": "export-app-icon"}
+  ],
+  "relaunchButtons": [
+    {"command": "export-nine-patch", "name": "Export", "multipleSelection": true}
   ]
 }

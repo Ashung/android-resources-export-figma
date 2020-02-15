@@ -10,7 +10,7 @@ Log in Figma then go to [plugin page](https://www.figma.com/c/plugin/73545289688
 
 ## Features
 
-**Export PNG** 
+**Export PNG**
 
 Export multiple sizes PNG from selected slice or exportable layer, with a fixed folder structure (drawable-xhdpi, etc..) and valid name.
 
@@ -28,6 +28,6 @@ MIT
 
 ## Donate
 
-[Buy me a coffee](https://www.buymeacoffee.com/ashung) or donate [$2.00](https://www.paypal.me/ashung/2) [$5.00](https://www.paypal.me/ashung/5) [$10.00](https://www.paypal.me/ashung/10) via PayPal.
+[Buy me a coffee](https://www.buymeacoffee.com/ashung) or donate [$5.00](https://www.paypal.me/ashung/5) via PayPal.
 
 [使用支付宝或微信扫码打赏](https://ashung.github.io/donate.html)

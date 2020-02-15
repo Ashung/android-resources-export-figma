@@ -1,7 +1,7 @@
 
-let command = figma.command;
-let currentPage = figma.currentPage;
-let selectedLayers = currentPage.selection;
+const command = figma.command;
+const currentPage = figma.currentPage;
+const selectedLayers = currentPage.selection;
 
 const exportOptions = [
     {scale: 1, dir: 'drawable-mdpi/'},
@@ -11,46 +11,44 @@ const exportOptions = [
     {scale: 4, dir: 'drawable-xxxhdpi/'},
 ];
 
-const exportOptionsForIcon = [
-    {scale: 1, dir: 'mipmap-mdpi/'},
-    {scale: 1.5, dir: 'mipmap-hdpi/'},
-    {scale: 2, dir: 'mipmap-xhdpi/'},
-    {scale: 3, dir: 'mipmap-xxhdpi/'},
-    {scale: 4, dir: 'mipmap-xxxhdpi/'},
-];
-
 if (command === 'export-png') {
+    // Get all exportable layers
+    let exportableLayers: any [] = [];
     if (selectedLayers.length === 0) {
-        figma.closePlugin('Please select at least 1 slice layer, exportable layer or group include slice.');
+        figma.root.children.forEach(page => {
+            exportableLayers = exportableLayers.concat(page.findAll(child => child.type === 'SLICE' || (<ExportMixin> child).exportSettings.length > 0));
+        });
     } else {
-        // Get all exportable layers
-        let exportableLayers: any [] = [];
         selectedLayers.forEach(layer => {
             if (layer.type === 'SLICE' || (<ExportMixin> layer).exportSettings.length > 0) {
                 exportableLayers.push(layer);
             }
             if (layer.type === 'GROUP') {
-                (<ChildrenMixin> layer).findAll(child => child.type === 'SLICE' || (<ExportMixin> child).exportSettings.length > 0).forEach(item => {
-                    exportableLayers.push(item);
-                });
+                exportableLayers = exportableLayers.concat((<ChildrenMixin> layer).findAll(child => child.type === 'SLICE' || (<ExportMixin> child).exportSettings.length > 0));
             }
         });
-        if (exportableLayers.length === 0) {
-            figma.closePlugin('No exportable layers in selection.');
+    }
+    if (exportableLayers.length === 0) {
+        let notify = 'No exportable layers in ';
+        if (selectedLayers.length === 0) {
+            notify += 'document.';
         } else {
-            Promise.all(exportableLayers.map(layer => getExportImagesFromLayer(layer, exportOptions)))
-                .then(exportImages => {
-                    figma.showUI(__html__, {width: 456, height: 288});
-                    figma.ui.postMessage({
-                        type: 'export-png',
-                        exportImages: exportImages
-                    });
-                })
-                .catch(error => {
-                    console.log(error);
-                    figma.closePlugin();
-                });
+            notify += 'selection.';
         }
+        figma.closePlugin(notify);
+    } else {
+        Promise.all(exportableLayers.map(layer => getExportImagesFromLayer(layer, exportOptions)))
+            .then(exportImages => {
+                const uiHeight = Math.min(exportableLayers.length * 48 + 16 + 48, 400);
+                figma.showUI(__html__, {width: 300, height: uiHeight});
+                figma.ui.postMessage({
+                    type: 'export-png',
+                    exportImages: exportImages
+                });
+            })
+            .catch(error => {
+                figma.closePlugin(error.message);
+            });
     }
 }
 
@@ -213,9 +211,15 @@ if (command === 'new-nine-patch') {
                 let groupAll = figma.group([groupContent, groupPatch], groupPatch.parent, groupAllIndex);
                 groupAll.name = toAndroidResourceName(lastSelectedLayer.name);
                 figma.currentPage.selection = [groupAll];
+                groupAll.expanded = false;
 
                 // Set plugin data
                 groupAll.setPluginData('resourceType', 'nine-patch');
+
+                // Set launch data
+                groupAll.setRelaunchData({
+                    'export-nine-patch': 'Export Nine-patch asset.'
+                });
             }
         }
         figma.closePlugin();
@@ -223,10 +227,13 @@ if (command === 'new-nine-patch') {
 }
 
 if (command === 'export-nine-patch') {
+    let ninePatchAssets: any [] = [];
     if (selectedLayers.length === 0) {
-        figma.closePlugin('Please select at least 1 nine-patch asset.');
+        figma.root.children.forEach(page => {
+            const assetsInPage = page.findAll(child => isMatchNinePatchLayerStructure(child) && child.getPluginData('resourceType') === 'nine-patch');
+            ninePatchAssets = ninePatchAssets.concat(assetsInPage);
+        });
     } else {
-        let ninePatchAssets: any [] = [];
         selectedLayers.forEach(layer => {
             if (
                 isMatchNinePatchLayerStructure(layer) &&
@@ -235,80 +242,44 @@ if (command === 'export-nine-patch') {
                 ninePatchAssets.push(layer);
             }
         });
-        if (ninePatchAssets.length === 0) {
-            figma.closePlugin('No any nine-patch asset in selection.');
+    }
+    if (ninePatchAssets.length === 0) {
+        let notify = 'No nine-patch asset in ';
+        if (selectedLayers.length === 0) {
+            notify += 'document.';
         } else {
-            Promise.all(ninePatchAssets.map(layer => getExportNinePatchFromLayer(layer, exportOptions)))
-                .then(exportNinePatchAssets => {
-                    figma.showUI(__html__, {width: 456, height: 288});
-                    figma.ui.postMessage({
-                        type: 'export-nine-patch',
-                        exportImages: exportNinePatchAssets
-                    });
-                })
-                .catch(error => {
-                    console.log(error);
-                    figma.closePlugin();
-                });
+            notify += 'selection.';
         }
+        figma.closePlugin(notify);
+    } else {
+        Promise.all(ninePatchAssets.map(layer => getExportNinePatchFromLayer(layer, exportOptions)))
+            .then(exportNinePatchAssets => {
+                const uiHeight = Math.min(ninePatchAssets.length * 48 + 16 + 48, 400);
+                figma.showUI(__html__, {width: 300, height: uiHeight});
+                figma.ui.postMessage({
+                    type: 'export-nine-patch',
+                    exportImages: exportNinePatchAssets
+                });
+            })
+            .catch(error => {
+                figma.closePlugin(error.message);
+            });
     }
 }
 
 if (command === 'new-app-icon') {
     figma.showUI(__html__, {visible: false});
     figma.ui.postMessage('new-app-icon');
-    figma.ui.onmessage = (images) => {
-        // New page
-        const newPage = figma.createPage();
-        newPage.name = 'app icon';
-        figma.currentPage = newPage;
-
-        // Old 48dp app launcher icon
-        createFrameWithGrid(0, 0, 48, 48, 0, 0, 48, 48, 'ic_launcher', images.old_icon_grid, newPage, false);
-
-        // 108dp adaptive icon
-        createFrameWithGrid(98, 0, 108, 108, 0, 0, 108, 108, 'ic_launcher_background', images.adaptive_icon_grid, newPage, true);
-        createFrameWithGrid(256, 0, 108, 108, 0, 0, 108, 108, 'ic_launcher_foreground', images.adaptive_icon_grid, newPage, false);
-
-        // Google play icon 512px
-        createFrameWithGrid(414, 0, 512, 512, 64, 64, 384, 384, 'playstore_icon', images.old_icon_grid, newPage, true);
-
-        figma.closePlugin();
-    };
-
-    function createFrameWithGrid(
-        x1: number, y1: number, width1: number, height1: number,
-        x2: number, y2: number, width2: number, height2: number,
-        name: string,
-        image: Uint8Array,
-        parent: ChildrenMixin,
-        background: Boolean
-    ) {
-        const frame = figma.createFrame();
-        frame.name = name;
-        frame.x = x1;
-        frame.y = y1;
-        frame.resize(width1, height1);
-        if (background === false) {
-            frame.backgrounds = [];
-        }
-        const grid = figma.createRectangle();
-        grid.name = 'grid';
-        grid.x = x2;
-        grid.y = y2;
-        grid.resize(width2, height2);
-        const paint: ImagePaint = {
-            type: 'IMAGE',
-            scaleMode: 'FILL',
-            imageHash: figma.createImage(image).hash
-        };
-        grid.fills = [paint];
-        frame.appendChild(grid);
-        parent.appendChild(frame);
-    }
 }
 
 if (command === 'export-app-icon') {
+    const exportOptionsForIcon = [
+        {scale: 1, dir: 'mipmap-mdpi/'},
+        {scale: 1.5, dir: 'mipmap-hdpi/'},
+        {scale: 2, dir: 'mipmap-xhdpi/'},
+        {scale: 3, dir: 'mipmap-xxhdpi/'},
+        {scale: 4, dir: 'mipmap-xxxhdpi/'},
+    ];
     // Find app icon resources
     let oldIcon: BaseNode;
     let adaptiveIconBackground: BaseNode;
@@ -336,15 +307,14 @@ if (command === 'export-app-icon') {
         }
         Promise.all(tasks)
             .then(exportImages => {
-                figma.showUI(__html__, {width: 456, height: 288});
+                figma.showUI(__html__, {width: 300, height: 256});
                 figma.ui.postMessage({
                     type: 'export-app-icon',
                     exportImages: exportImages
                 });
             })
             .catch(error => {
-                console.log(error);
-                figma.closePlugin();
+                figma.closePlugin(error.message);
             });
     } else {
         let missFrames: string [] = [];
@@ -359,6 +329,87 @@ if (command === 'export-app-icon') {
         }
         figma.closePlugin('Can\'t find the frame named "' + missFrames.join(', ') + '".');
     }
+}
+
+figma.ui.onmessage = message => {
+
+    // New App icon
+    if (message.type === 'newAppIcon') {
+        const images = message.images;
+        // New page
+        const newPage = figma.createPage();
+        newPage.name = 'app icon';
+        figma.currentPage = newPage;
+
+        // Old 48dp app launcher icon
+        createFrameWithGrid(0, 0, 48, 48, 0, 0, 48, 48, 'ic_launcher', images.old_icon_grid, newPage, false);
+
+        // 108dp adaptive icon
+        createFrameWithGrid(98, 0, 108, 108, 0, 0, 108, 108, 'ic_launcher_background', images.adaptive_icon_grid, newPage, true);
+        createFrameWithGrid(256, 0, 108, 108, 0, 0, 108, 108, 'ic_launcher_foreground', images.adaptive_icon_grid, newPage, false);
+
+        // Google play icon 512px
+        createFrameWithGrid(414, 0, 512, 512, 64, 64, 384, 384, 'playstore_icon', images.old_icon_grid, newPage, true);
+
+        figma.closePlugin();
+    }
+
+    // Show layer
+    if (message.type === 'showLayer') {
+        const layerId = message.id;
+        const page = getParentPageByLayerId(layerId);
+        if (page) {
+            figma.currentPage = page;
+            const layer = page.findOne(node => node.id === layerId);
+            figma.viewport.scrollAndZoomIntoView([layer]);
+        }
+    }
+
+    // Notify
+    if (message.type === 'notify') {
+        figma.notify(message.text);
+    }
+}
+
+function getParentPageByLayerId(id: string): PageNode {
+    for (let i = 0; i < figma.root.children.length; i++) {
+        const page = figma.root.children[i];
+        const haveLayer = page.findOne(node => node.id === id);
+        if (haveLayer) {
+            return page;
+        }
+    }
+}
+
+function createFrameWithGrid(
+    x1: number, y1: number, width1: number, height1: number,
+    x2: number, y2: number, width2: number, height2: number,
+    name: string,
+    image: Uint8Array,
+    parent: ChildrenMixin,
+    background: Boolean
+): void {
+    const frame = figma.createFrame();
+    frame.name = name;
+    frame.x = x1;
+    frame.y = y1;
+    frame.resize(width1, height1);
+    if (background === false) {
+        frame.backgrounds = [];
+    }
+    const grid = figma.createRectangle();
+    grid.name = 'grid';
+    grid.x = x2;
+    grid.y = y2;
+    grid.resize(width2, height2);
+    const paint: ImagePaint = {
+        type: 'IMAGE',
+        scaleMode: 'FILL',
+        imageHash: figma.createImage(image).hash
+    };
+    grid.fills = [paint];
+    frame.appendChild(grid);
+    parent.appendChild(frame);
 }
 
 function isMatchNinePatchLayerStructure(group: BaseNode): Boolean {
@@ -390,6 +441,7 @@ async function getExportImagesFromLayer(layer: any, options: any []): Promise<an
         const imageData = await (<ExportMixin> layer).exportAsync(exportSetting);
         const scale = option.scale;
         return {
+            id: layer.id,
             width: Math.round(layer.width * scale),
             height: Math.round(layer.height * scale),
             path: option.dir + assetName + '.png',
@@ -432,6 +484,7 @@ async function getExportNinePatchFromLayer(layer: any, options: any []): Promise
     contentSlice.remove();
 
     return {
+        id: layer.id,
         name: assetName,
         patchImage: {
             width: (<LayoutMixin> patch).width,

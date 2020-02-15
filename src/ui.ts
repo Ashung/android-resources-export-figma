@@ -1,7 +1,7 @@
 import './ui.css';
 
-import JSZip from '../node_modules/jszip'; 
-import images from './images.json';
+import JSZip from 'jszip'; 
+import guideImages from './images.json';
 
 window.onmessage = async (event) => {
     const pluginMessage = event.data.pluginMessage;
@@ -10,133 +10,190 @@ window.onmessage = async (event) => {
         return;
     }
 
-    if (pluginMessage.type === 'show-message') {
-        const message = pluginMessage.text;
-        const tip = document.createElement('div');
-        tip.className = 'onboarding-tip';
-        const tipIcon = document.createElement('div');
-        tipIcon.className = 'onboarding-tip__icon';
-        const icon = document.createElement('div');
-        icon.className = 'icon icon--plugin';
-        const text = document.createElement('div'); 
-        text.className = 'onboarding-tip__msg';
-        text.textContent = message;
-        tipIcon.appendChild(icon);
-        tip.appendChild(tipIcon);
-        tip.appendChild(text);
-        const contentDiv = document.getElementById('content');
-        const appDiv = document.getElementById('app');
-        contentDiv.appendChild(tip);
-        appDiv.className += ' session__message';
-    }
-
     // Export PNG
     if (pluginMessage.type === 'export-png') {
-        const name: string = pluginMessage.exportImages.length > 1 ? 'assets' : pluginMessage.exportImages[0][0].path.match(/.*\/(.*)\.png/)[1];
         const assets = await getPNGAssetsFromPluginMessage(pluginMessage);
         createAssetsPreview(assets);
-        showDownloadButton(assets, name);
     }
 
     // Export nine-patch
     if (pluginMessage.type === 'export-nine-patch') {
-        const name: string = pluginMessage.exportImages.length > 1 ? 'assets' : pluginMessage.exportImages[0].name.replace(/\.png$/);
         const assets = await getNinePatchAssetsFromPluginMessage(pluginMessage);
         createAssetsPreview(assets);
-        showDownloadButton(assets, name);
     }
 
     // New app icon
     if (pluginMessage === 'new-app-icon') {
-        for (let key in images) {
-            images[key] = base64ToUint8Array(images[key]);
+        for (let key in guideImages) {
+            guideImages[key] = base64ToUint8Array(guideImages[key]);
         }
-        window.parent.postMessage({pluginMessage: images}, '*')
+        parent.postMessage({
+            pluginMessage: {
+                type: 'newAppIcon',
+                images: guideImages
+            }
+        }, '*');
     }
 
     // Export app icon
     if (pluginMessage.type === 'export-app-icon') {
         const assets = await getPNGAssetsFromPluginMessage(pluginMessage);
-
-        // Adaptive icon XML 
-        const xml = '<?xml version="1.0" encoding="utf-8"?>\n' +
-            '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n' +
-            '    <background android:drawable="@mipmap/ic_launcher_background" />\n' +
-            '    <foreground android:drawable="@mipmap/ic_launcher_foreground" />\n' +
-            '</adaptive-icon>'
-        assets.push({
-            path: 'mipmap-v26/ic_launcher.xml',
-            text: xml
-        });
-        
-        // Icon preview
-        const oldIcon = assets.find(item => item.path === 'mipmap-xxxhdpi/ic_launcher.png');
-        const adaptiveIconBackground = assets.find(item => item.path === 'mipmap-xxxhdpi/ic_launcher_background.png');
-        const adaptiveIconForeground = assets.find(item => item.path === 'mipmap-xxxhdpi/ic_launcher_foreground.png');
-        const playStoreIcon = assets.find(item => item.path === 'playstore_icon.png');
-        const contentDiv = document.getElementById('content');
-
-        const item1 = document.createElement('div');
-        item1.className = 'thumb';
-        const img1 = document.createElement('div');
-        img1.className = 'thumb__img thumb__img--old-app-icon';
-        img1.style.backgroundImage = 'url("' + oldIcon.base64 + '")';
-        const text1 = document.createElement('div');
-        text1.className = 'type type--11-pos thumb__txt';
-        text1.textContent = 'Normal Icon';
-        item1.appendChild(img1);
-        item1.appendChild(text1);
-        contentDiv.appendChild(item1);
-
-        const item2 = document.createElement('div');
-        item2.className = 'thumb';
-        const img2 = document.createElement('div');
-        img2.className = 'thumb__img thumb__img--app-icon-adaptive';
-        img2.style.backgroundImage = 'url("' + adaptiveIconForeground.base64 + '"),url("' + adaptiveIconBackground.base64 + '")';
-        const text2 = document.createElement('div');
-        text2.className = 'type type--11-pos thumb__txt';
-        text2.textContent = 'Adaptive Icon';
-        item2.appendChild(img2);
-        item2.appendChild(text2);
-        contentDiv.appendChild(item2);
-
-        if (playStoreIcon) {
-            const item3 = document.createElement('div');
-            item3.className = 'thumb';
-            const img3 = document.createElement('div');
-            img3.className = 'thumb__img thumb__img--app-icon-playstore';
-            img3.style.backgroundImage = 'url("' + playStoreIcon.base64 + '")';
-            const text3 = document.createElement('div');
-            text3.className = 'type type--11-pos thumb__txt';
-            text3.innerText = 'Play Store Icon';
-            item3.appendChild(img3);
-            item3.appendChild(text3);
-            contentDiv.appendChild(item3);
-        }
-
-        // Download button
-        showDownloadButton(assets, 'launcher_icon');
+        createAssetsPreview(assets, true);
     }
 }
 
-function createAssetsPreview(assets: any []) {
+function createAssetsPreview(assets: any [], exportIcon?: boolean) {
     const contentDiv = document.getElementById('content');
+    const footerDiv = document.getElementById('footer');
+    const assetsCount = Math.ceil(assets.length / 5);
+
+    const selectAllCheckboxWrap = document.createElement('label');
+    selectAllCheckboxWrap.className = 'selectAll__wrap';
+    const selectAllCheckbox = document.createElement('input');
+    selectAllCheckbox.type = 'checkbox';
+    selectAllCheckbox.className = 'checkbox';
+    selectAllCheckbox.id = 'selectAll';
+    selectAllCheckbox.checked = true;
+    if (!exportIcon) {
+        selectAllCheckboxWrap.appendChild(selectAllCheckbox);
+    }
+    footerDiv.appendChild(selectAllCheckboxWrap);
+
+    const selectAllLabel = document.createElement('div');
+    selectAllLabel.className = 'type type--11-pos selectAll__label';
+    const selectAllLabelText = document.createElement('label');
+    selectAllLabelText.setAttribute('for', 'selectAll');
+    selectAllLabelText.textContent = `${assetsCount} / ${assetsCount}`;
+    if (!exportIcon) {
+        selectAllLabel.appendChild(selectAllLabelText);
+    }
+    footerDiv.appendChild(selectAllLabel);
+
+    const exportButton = document.createElement('button');
+    exportButton.className = 'button button--primary';
+    exportButton.textContent = 'Export';
+    footerDiv.appendChild(exportButton);
+
+    let selectedCount = assetsCount;
     assets.forEach(item => {
-        if (/^drawable-xxxhdpi/.test(item.path)) {
+        if (/^(drawable|mipmap)-mdpi/.test(item.path) || item.path === 'playstore_icon.png') {
             const itemDiv = document.createElement('div');
-            itemDiv.className = 'thumb';
-            const image = document.createElement('div');
-            image.className = 'thumb__img';
-            image.style.backgroundImage = 'url("' + item.base64 + '")';
-            const text = document.createElement('div');
-            text.className = 'type type--11-pos thumb__txt';
-            const name = item.path.replace(/^drawable-xxxhdpi\//, '').replace(/\.png$/, '');
-            text.textContent = name;
-            itemDiv.appendChild(image);
-            itemDiv.appendChild(text);
+            itemDiv.className = 'export-item';
+            if (exportIcon) {
+                itemDiv.className = 'export-item export-item--appIcon';
+            }
             contentDiv.appendChild(itemDiv);
+
+            const checkboxWrap = document.createElement('label');
+            checkboxWrap.className = 'export-item__checkbox';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = '_' + item.id;
+            checkbox.className = 'checkbox';
+            checkbox.checked = true;
+            if (!exportIcon) {
+                checkboxWrap.appendChild(checkbox);
+            }
+            itemDiv.appendChild(checkboxWrap);
+
+            const thumb = document.createElement('div');
+            thumb.className = 'export-item__thumb';
+            const image = document.createElement('img');
+            image.src = item.base64;
+            thumb.appendChild(image);
+            itemDiv.appendChild(thumb);
+
+            const textWrap = document.createElement('div');
+            textWrap.className = 'type type--11-pos export-item__text';
+            const text = document.createElement('label');
+            text.textContent = item.path.replace(/^(drawable|mipmap)-mdpi\//, '');
+            text.setAttribute('for', '_' + item.id);
+            textWrap.appendChild(text);
+            itemDiv.appendChild(textWrap);
+
+            if (!exportIcon) {
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        selectedCount ++;
+                    } else {
+                        selectedCount --;
+                    }
+                    if (selectedCount === assetsCount || selectedCount === 0) {
+                        selectAllCheckbox.className = 'checkbox';
+                        if (selectedCount === 0) {
+                            selectAllCheckbox.checked = false;
+                        } else {
+                            selectAllCheckbox.checked = true;
+                        }
+                    } else {
+                        selectAllCheckbox.className = 'checkbox checkbox--mix';
+                        selectAllCheckbox.checked = true;
+                    }
+                    selectAllLabelText.textContent = `${selectedCount} / ${assetsCount}`;
+                });
+            }
+
+            image.onclick = () => {
+                parent.postMessage({
+                    pluginMessage: {
+                        type: 'showLayer',
+                        id: item.id
+                    }
+                }, '*');
+            };
         }
     });
+
+    selectAllCheckbox.onchange = () => {
+        for (let i = 0; i < contentDiv.children.length; i++) {
+            const checkbox = contentDiv.children[i].firstChild.firstChild;
+            (<HTMLInputElement> checkbox).checked = selectAllCheckbox.checked;
+        }
+        if (selectAllCheckbox.checked) {
+            selectedCount = assetsCount;
+        } else {
+            selectedCount = 0;
+        }
+        selectAllCheckbox.className = 'checkbox';
+        selectAllLabelText.textContent = `${selectedCount} / ${assetsCount}`;
+    };
+
+    // Export button
+    exportButton.onclick = () => {
+        if (selectedCount === 0) {
+            parent.postMessage({
+                pluginMessage: {
+                    type: 'notify',
+                    text: 'Please select at least 1 asset to export.'
+                }
+            }, '*');
+            return;
+        }
+        exportButton.disabled = true;
+        const zip = new JSZip();
+        for (let file of assets) {
+            const fileSelected = exportIcon ? true : (<HTMLInputElement> document.getElementById('_' + file.id)).checked;
+            if (fileSelected) {
+                zip.file(file.path, file.base64.replace('data:image/png;base64,', ''), {base64: true});
+            }
+        }
+        // Adaptive icon XML 
+        if (exportIcon) {
+            const xml = '<?xml version="1.0" encoding="utf-8"?>\n' +
+                '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n' +
+                '    <background android:drawable="@mipmap/ic_launcher_background" />\n' +
+                '    <foreground android:drawable="@mipmap/ic_launcher_foreground" />\n' +
+                '</adaptive-icon>';
+            zip.file('mipmap-v26/ic_launcher.xml', xml);
+        }
+        zip.generateAsync({type: 'blob'}).then((content: Blob) => {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);;
+            link.download = 'assets_' + formatedData() + '.zip';
+            link.click();
+        });
+        exportButton.disabled = false;
+    };
 }
 
 async function getPNGAssetsFromPluginMessage(pluginMessage: any): Promise<any []> {
@@ -145,6 +202,7 @@ async function getPNGAssetsFromPluginMessage(pluginMessage: any): Promise<any []
         for (const item of exportImage) {
             const canvas = await figmaImageDataToCanvas(item.imageData);
             assets.push({
+                id: item.id,
                 path: item.path,
                 base64: canvasToBase64(canvas)
             });
@@ -178,38 +236,6 @@ function canvasToBase64(canvas: HTMLCanvasElement): string {
     return canvas.toDataURL('image/png');
 }
 
-/**
- * @param  {any[]} assets [{path: string, blob: Blob, text: string}]
- * @param  {string} name
- * @returns Promise
- */
-function showDownloadButton(assets: any [], name: string): Promise<null> {
-    return new Promise((resolve, reject) => {
-        let zip = new JSZip();
-        for (let file of assets) {
-            if (file.blob) {
-                zip.file(file.path, file.blob, {binary: true});
-            } else if (file.base64) {
-                zip.file(file.path, file.base64.replace('data:image/png;base64,', ''), {base64: true});
-            } else if (file.text) {
-                zip.file(file.path, file.text);
-            }
-        }
-        zip.generateAsync({type: 'blob'})
-        .then((content: Blob) => {
-            const blobURL = window.URL.createObjectURL(content);
-            const link = document.createElement('a');
-            link.className = 'button button--primary';
-            link.href = blobURL;
-            link.text = 'Save';
-            link.setAttribute('download', name + '.zip');
-            document.getElementById('footer').appendChild(link);
-            resolve();
-        });
-    });
-}
-
-// @returns Array [{path: string, blob: Blob}]
 async function getNinePatchAssetsFromPluginMessage(pluginMessage: any): Promise<any []> {
     let assets: any [] = [];
     for (const ninePatchImage of pluginMessage.exportImages) {
@@ -238,6 +264,7 @@ async function getNinePatchAssetsFromPluginMessage(pluginMessage: any): Promise<
             // Content
             ctx.putImageData(contentData, 1, 1);
             assets.push({
+                id: ninePatchImage.id,
                 path: contentImage.path,
                 base64: canvasToBase64(canvas)
             });
@@ -315,4 +342,14 @@ function base64ToUint8Array(base64: string): Uint8Array {
         bytes[i] = binaryString.charCodeAt(i);
     }
     return bytes;
+}
+
+function formatedData(): string {
+    let d = new Date();
+    let result = '' + d.getFullYear();
+    result += (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1);
+    result += (d.getDate() < 10 ? '0' : '') + d.getDate();
+    result += (d.getHours() < 10 ? '0' : '') + d.getHours();
+    result += (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+    return result;
 }
