@@ -1,7 +1,6 @@
 import './ui.css';
-
-import JSZip from 'jszip'; 
 import guideImages from './images.json';
+import JSZip from 'jszip';
 
 window.onmessage = async (event) => {
     const pluginMessage = event.data.pluginMessage;
@@ -189,7 +188,7 @@ function createAssetsPreview(assets: any [], exportIcon?: boolean) {
         zip.generateAsync({type: 'blob'}).then((content: Blob) => {
             const link = document.createElement('a');
             link.href = URL.createObjectURL(content);;
-            link.download = 'assets_' + formatedData() + '.zip';
+            link.download = 'assets_' + formatDate() + '.zip';
             link.click();
         });
         exportButton.disabled = false;
@@ -344,7 +343,7 @@ function base64ToUint8Array(base64: string): Uint8Array {
     return bytes;
 }
 
-function formatedData(): string {
+function formatDate(): string {
     let d = new Date();
     let result = '' + d.getFullYear();
     result += (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1);

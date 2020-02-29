@@ -1,5 +1,5 @@
-
 const command = figma.command;
+const doc = figma.root;
 const currentPage = figma.currentPage;
 const selectedLayers = currentPage.selection;
 
@@ -10,6 +10,60 @@ const exportOptions = [
     {scale: 3, dir: 'drawable-xxhdpi/'},
     {scale: 4, dir: 'drawable-xxxhdpi/'},
 ];
+
+if (command === 'new-png') {
+    if (selectedLayers.length === 0) {
+        figma.closePlugin('Please select at least 1 layer.');
+    } else {
+        // Add a slice
+        selectedLayers.forEach(layer => {
+            if (['FRAME', 'GROUP', 'COMPONENT'].includes(layer.type)) {
+                const slice = figma.createSlice();
+                slice.name = toAndroidResourceName(layer.name);
+                slice.resize(layer.width, layer.height);
+                if (layer.type === 'GROUP') {
+                    slice.x = layer.x;
+                    slice.y = layer.y;
+                } else {
+                    slice.x = 0;
+                    slice.y = 0;
+                }
+                layer = layer as FrameNode | GroupNode | ComponentNode;
+                layer.insertChild(0, slice);
+                // Set relaunch data
+                slice.setRelaunchData({
+                    'export-png': 'Export Android png asset.'
+                });
+            }
+            if (['INSTANCE', 'BOOLEAN_OPERATION', 'VECTOR', 'STAR', 'LINE', 'ELLIPSE', 'POLYGON', 'RECTANGLE', 'TEXT'].includes(layer.type)) {
+                const group = figma.group([layer], layer.parent, layer.parent.children.indexOf(layer));
+                group.name = layer.name;
+                const slice = figma.createSlice();
+                slice.name = toAndroidResourceName(layer.name);
+                slice.resize(layer.width, layer.height);
+                slice.x = layer.x;
+                slice.y = layer.y;
+                group.insertChild(0, slice);
+                // Set relaunch data
+                slice.setRelaunchData({
+                    'export-png': 'Export Android png asset.'
+                });
+            }
+        });
+
+        // Set relaunch data
+        doc.setPluginData('have-png-assets', '1');
+        let relaunchData = {
+            'export-png': 'Export all Android png asset in current document.'
+        };
+        if (doc.getPluginData('have-nine-patch-assets') === '1') {
+            relaunchData['export-nine-patch'] = 'Export all Android nine-patch asset in current document.';
+        }
+        doc.setRelaunchData(relaunchData);
+
+        figma.closePlugin();
+    }
+}
 
 if (command === 'export-png') {
     // Get all exportable layers
@@ -59,11 +113,14 @@ if (command === 'new-nine-patch') {
         let hasNinePatchInSelectedLayers = selectedLayers.some(node => node.getPluginData('resourceType') === 'nine-patch');
         if (hasNinePatchInSelectedLayers) {
             figma.closePlugin('Selected layers have a nine-patch resource.');
-        }
-        else {
+        } else {
             if (selectedLayers.length === 1 && isMatchNinePatchLayerStructure(selectedLayers[0])) {
                 const group = selectedLayers[0];
                 group.setPluginData('resourceType', 'nine-patch');
+                // Set launch data
+                group.setRelaunchData({
+                    'export-nine-patch': 'Export Android nine-patch asset.'
+                });
             } else {
                 // Get influence frame [top, right, bottom, left]
                 let influenceFrame: number[] = [Infinity, -Infinity, -Infinity, Infinity];
@@ -218,9 +275,18 @@ if (command === 'new-nine-patch') {
 
                 // Set launch data
                 groupAll.setRelaunchData({
-                    'export-nine-patch': 'Export Nine-patch asset.'
+                    'export-nine-patch': 'Export Android nine-patch asset.'
                 });
             }
+            // Set launch data to document
+            doc.setPluginData('have-nine-patch-assets', '1');
+            let relaunchData = {
+                'export-nine-patch': 'Export all Android nine-patch asset in current document.'
+            };
+            if (doc.getPluginData('have-png-assets') === '1') {
+                relaunchData['export-png'] = 'Export all Android png asset in current document.';
+            }
+            doc.setRelaunchData(relaunchData);
         }
         figma.closePlugin();
     }
@@ -351,6 +417,11 @@ figma.ui.onmessage = message => {
         // Google play icon 512px
         createFrameWithGrid(414, 0, 512, 512, 64, 64, 384, 384, 'playstore_icon', images.old_icon_grid, newPage, true);
 
+        // Set relaunch data
+        newPage.setRelaunchData({
+            'export-app-icon': 'Export Android app icons.'
+        });
+
         figma.closePlugin();
     }
 
@@ -362,6 +433,7 @@ figma.ui.onmessage = message => {
             figma.currentPage = page;
             const layer = page.findOne(node => node.id === layerId);
             figma.viewport.scrollAndZoomIntoView([layer]);
+            figma.currentPage.selection = [layer];
         }
     }
 
@@ -369,6 +441,7 @@ figma.ui.onmessage = message => {
     if (message.type === 'notify') {
         figma.notify(message.text);
     }
+
 }
 
 function getParentPageByLayerId(id: string): PageNode {
@@ -495,7 +568,7 @@ async function getExportNinePatchFromLayer(layer: any, options: any []): Promise
     };
 }
 
-function toAndroidResourceName(name: string) : string {
+function toAndroidResourceName(name: string): string {
     name = name.substr(name.lastIndexOf('/') + 1);
     // Latin to ascii
     const latinToAsciiMapping = {

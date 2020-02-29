@@ -5,6 +5,7 @@
   "main": "dist/code.js",
   "ui": "dist/ui.html",
   "menu": [
+    {"name": "New PNG", "command": "new-png"},
     {"name": "Export PNG", "command": "export-png"},
     {"separator": true},
     {"name": "New Nine-patch", "command": "new-nine-patch"},
@@ -14,6 +15,8 @@
     {"name": "Export App Icon", "command": "export-app-icon"}
   ],
   "relaunchButtons": [
-    {"command": "export-nine-patch", "name": "Export", "multipleSelection": true}
+    {"command": "export-png", "name": "Export PNG Assets", "multipleSelection": true},
+    {"command": "export-nine-patch", "name": "Export Nine-Patch", "multipleSelection": true},
+    {"command": "export-app-icon", "name": "Export App Icon"}
   ]
 }

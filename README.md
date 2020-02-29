@@ -10,7 +10,7 @@ Log in Figma then go to [plugin page](https://www.figma.com/c/plugin/73545289688
 
 ## Features
 
-**Export PNG**
+**Create and Export PNG**
 
 Export multiple sizes PNG from selected slice or exportable layer, with a fixed folder structure (drawable-xhdpi, etc..) and valid name.
 

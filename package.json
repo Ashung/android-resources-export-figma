@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "watch": "npx webpack --mode=development --watch",
-    "publish": "npx webpack --mode=production"
+    "publish": "npx webpack --mode=production",
+    "update_typings_file": "curl -O https://www.figma.com/plugin-docs/figma.d.ts"
   },
   "repository": {
     "type": "git",
