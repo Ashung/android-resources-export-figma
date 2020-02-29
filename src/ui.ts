@@ -183,7 +183,7 @@ function createAssetsPreview(assets: any [], exportIcon?: boolean) {
                 '    <background android:drawable="@mipmap/ic_launcher_background" />\n' +
                 '    <foreground android:drawable="@mipmap/ic_launcher_foreground" />\n' +
                 '</adaptive-icon>';
-            zip.file('mipmap-v26/ic_launcher.xml', xml);
+            zip.file('mipmap-anydpi-v26/ic_launcher.xml', xml);
         }
         zip.generateAsync({type: 'blob'}).then((content: Blob) => {
             const link = document.createElement('a');

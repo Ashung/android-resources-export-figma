@@ -17,6 +17,10 @@ if (command === 'new-png') {
     } else {
         // Add a slice
         selectedLayers.forEach(layer => {
+            const defaultExportSetting: ExportSettingsImage = {
+                contentsOnly: true,
+                format: 'PNG'
+            };
             if (['FRAME', 'GROUP', 'COMPONENT'].includes(layer.type)) {
                 const slice = figma.createSlice();
                 slice.name = toAndroidResourceName(layer.name);
@@ -28,6 +32,7 @@ if (command === 'new-png') {
                     slice.x = 0;
                     slice.y = 0;
                 }
+                slice.exportSettings = [defaultExportSetting];
                 layer = layer as FrameNode | GroupNode | ComponentNode;
                 layer.insertChild(0, slice);
                 // Set relaunch data
@@ -43,6 +48,7 @@ if (command === 'new-png') {
                 slice.resize(layer.width, layer.height);
                 slice.x = layer.x;
                 slice.y = layer.y;
+                slice.exportSettings = [defaultExportSetting];
                 group.insertChild(0, slice);
                 // Set relaunch data
                 slice.setRelaunchData({
