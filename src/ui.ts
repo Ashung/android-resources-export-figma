@@ -41,7 +41,7 @@ window.onmessage = async (event) => {
     }
 }
 
-function createAssetsPreview(assets: any [], exportIcon?: boolean) {
+function createAssetsPreview(assets: {id: string, path: string, data?: Uint8Array, base64?: string}[], exportIcon?: boolean) {
     const contentDiv = document.getElementById('content');
     const footerDiv = document.getElementById('footer');
     const assetsCount = Math.ceil(assets.length / 5);
@@ -98,14 +98,19 @@ function createAssetsPreview(assets: any [], exportIcon?: boolean) {
             const thumb = document.createElement('div');
             thumb.className = 'export-item__thumb';
             const image = document.createElement('img');
-            image.src = item.base64;
+            if (item.data) {
+                image.src = uint8ArrayToObjectURL(item.data);
+            }
+            if (item.base64) {
+                image.src = item.base64;
+            }
             thumb.appendChild(image);
             itemDiv.appendChild(thumb);
 
             const textWrap = document.createElement('div');
             textWrap.className = 'type type--11-pos export-item__text';
             const text = document.createElement('label');
-            text.textContent = item.path.replace(/^(drawable|mipmap)-mdpi\//, '');
+            text.textContent = item.path.replace(/^(drawable|mipmap)-(m|h|xh|xxh|xxxh)dpi\//, '');
             text.setAttribute('for', '_' + item.id);
             textWrap.appendChild(text);
             itemDiv.appendChild(textWrap);
@@ -173,10 +178,15 @@ function createAssetsPreview(assets: any [], exportIcon?: boolean) {
         for (let file of assets) {
             const fileSelected = exportIcon ? true : (<HTMLInputElement> document.getElementById('_' + file.id)).checked;
             if (fileSelected) {
-                zip.file(file.path, file.base64.replace('data:image/png;base64,', ''), {base64: true});
+                if (file.data) {
+                    zip.file(file.path, file.data);
+                }
+                if (file.base64) {
+                    zip.file(file.path, file.base64.replace('data:image/png;base64,', ''), {base64: true});
+                }
             }
         }
-        // Adaptive icon XML 
+        // Adaptive icon XML
         if (exportIcon) {
             const xml = '<?xml version="1.0" encoding="utf-8"?>\n' +
                 '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n' +
@@ -195,15 +205,14 @@ function createAssetsPreview(assets: any [], exportIcon?: boolean) {
     };
 }
 
-async function getPNGAssetsFromPluginMessage(pluginMessage: any): Promise<any []> {
+async function getPNGAssetsFromPluginMessage(pluginMessage: any): Promise<{id: string, path: string, data: Uint8Array} []> {
     let assets: any [] = [];
     for (const exportImage of pluginMessage.exportImages) {
         for (const item of exportImage) {
-            const canvas = await figmaImageDataToCanvas(item.imageData);
             assets.push({
                 id: item.id,
                 path: item.path,
-                base64: canvasToBase64(canvas)
+                data: item.imageData
             });
         }
     }
@@ -235,7 +244,25 @@ function canvasToBase64(canvas: HTMLCanvasElement): string {
     return canvas.toDataURL('image/png');
 }
 
-async function getNinePatchAssetsFromPluginMessage(pluginMessage: any): Promise<any []> {
+// interface NinePatchAssetPatch {
+//     width: number,
+//     height: number,
+//     imageData: Uint8Array
+// }
+// interface NinePatchAssetContent {
+//     scale: number,
+//     width: number,
+//     height: number,
+//     path: string,
+//     imageData: Uint8Array
+// }
+// interface NinePatchAsset {
+//     id: string,
+//     name: string,
+//     patchImage: NinePatchAssetPatch,
+//     contentImages: NinePatchAssetContent[]
+// }
+async function getNinePatchAssetsFromPluginMessage(pluginMessage: any): Promise<{id: string, path: string, base64: string} []> {
     let assets: any [] = [];
     for (const ninePatchImage of pluginMessage.exportImages) {
         const contentImages = ninePatchImage.contentImages;
@@ -248,6 +275,8 @@ async function getNinePatchAssetsFromPluginMessage(pluginMessage: any): Promise<
             const contentCanvas = await figmaImageDataToCanvas(contentImage.imageData);
             const patchData = canvasToImageData(patchCanvas);
             const contentData = canvasToImageData(contentCanvas);
+            // Content
+            ctx.putImageData(contentData, 1, 1);
             // Top
             const topPatchData = patchLineFromImageData(patchData, 'top', contentImage.scale);
             ctx.putImageData(topPatchData, 1, 0);
@@ -260,8 +289,6 @@ async function getNinePatchAssetsFromPluginMessage(pluginMessage: any): Promise<
             // Left
             const leftPatchData = patchLineFromImageData(patchData, 'left', contentImage.scale);
             ctx.putImageData(leftPatchData, 0, 1);
-            // Content
-            ctx.putImageData(contentData, 1, 1);
             assets.push({
                 id: ninePatchImage.id,
                 path: contentImage.path,
@@ -275,20 +302,20 @@ async function getNinePatchAssetsFromPluginMessage(pluginMessage: any): Promise<
 // @param  side: top | right | bottom | left
 function patchLineFromImageData(data: ImageData, side: string, scale: number): ImageData {
     let originalPatchLineData;
-    let originalWidth;
-    let originalHeight;
+    let originalWidth: number;
+    let originalHeight: number;
     let width = 1;
     let height = 1;
     if (side === 'top') {
         originalWidth = data.width - 2;
         originalHeight = 1;
-        width = Math.floor(originalWidth * scale);
+        width = Math.round(originalWidth * scale);
         originalPatchLineData = data.data.slice(4, originalWidth * 4 + 4);
     }
     if (side === 'right') {
         originalWidth = 1;
         originalHeight = data.height - 2;
-        height = Math.floor(originalHeight * scale);
+        height = Math.round(originalHeight * scale);
         originalPatchLineData = data.data.filter((item, index) => {
             return index % ((data.width) * 4) == data.width * 4 - 4 ||
                 index % ((data.width) * 4) == data.width * 4 - 3 ||
@@ -300,13 +327,13 @@ function patchLineFromImageData(data: ImageData, side: string, scale: number): I
     if (side === 'bottom') {
         originalWidth = data.width - 2;
         originalHeight = 1;
-        width = Math.floor(originalWidth * scale);
+        width = Math.round(originalWidth * scale);
         originalPatchLineData = data.data.slice(data.width * (data.height - 1) * 4 + 4, originalWidth * 4 + data.width * (data.height - 1) * 4 + 4);
     }
     if (side === 'left') {
         originalWidth = 1;
         originalHeight = data.height - 2;
-        height = Math.floor(originalHeight * scale);
+        height = Math.round(originalHeight * scale);
         originalPatchLineData = data.data.filter((item, index) => {
             return index % ((data.width) * 4) == 0 ||
                 index % ((data.width) * 4) == 1 ||
@@ -343,6 +370,10 @@ function base64ToUint8Array(base64: string): Uint8Array {
     return bytes;
 }
 
+function uint8ArrayToObjectURL(data: Uint8Array): string {
+    return URL.createObjectURL(new Blob([data], { type: 'image/png' }));
+}
+
 function formatDate(): string {
     let d = new Date();
     let result = '' + d.getFullYear();
@@ -350,5 +381,6 @@ function formatDate(): string {
     result += (d.getDate() < 10 ? '0' : '') + d.getDate();
     result += (d.getHours() < 10 ? '0' : '') + d.getHours();
     result += (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+    result += (d.getSeconds() < 10 ? '0' : '') + d.getSeconds();
     return result;
 }

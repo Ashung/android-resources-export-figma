@@ -87,15 +87,14 @@ if (command === 'export-png') {
                 exportableLayers = exportableLayers.concat((<ChildrenMixin> layer).findAll(child => child.type === 'SLICE' || (<ExportMixin> child).exportSettings.length > 0));
             }
         });
+        if (exportableLayers.length === 0) {
+            figma.root.children.forEach(page => {
+                exportableLayers = exportableLayers.concat(page.findAll(child => child.type === 'SLICE' || (<ExportMixin> child).exportSettings.length > 0));
+            });
+        }
     }
     if (exportableLayers.length === 0) {
-        let notify = 'No exportable layers in ';
-        if (selectedLayers.length === 0) {
-            notify += 'document.';
-        } else {
-            notify += 'selection.';
-        }
-        figma.closePlugin(notify);
+        figma.closePlugin('No exportable layers in document.');
     } else {
         Promise.all(exportableLayers.map(layer => getExportImagesFromLayer(layer, exportOptions)))
             .then(exportImages => {
@@ -314,15 +313,15 @@ if (command === 'export-nine-patch') {
                 ninePatchAssets.push(layer);
             }
         });
+        if (ninePatchAssets.length === 0) {
+            figma.root.children.forEach(page => {
+                const assetsInPage = page.findAll(child => isMatchNinePatchLayerStructure(child) && child.getPluginData('resourceType') === 'nine-patch');
+                ninePatchAssets = ninePatchAssets.concat(assetsInPage);
+            });
+        }
     }
     if (ninePatchAssets.length === 0) {
-        let notify = 'No nine-patch asset in ';
-        if (selectedLayers.length === 0) {
-            notify += 'document.';
-        } else {
-            notify += 'selection.';
-        }
-        figma.closePlugin(notify);
+        figma.closePlugin('No nine-patch asset in document.');
     } else {
         Promise.all(ninePatchAssets.map(layer => getExportNinePatchFromLayer(layer, exportOptions)))
             .then(exportNinePatchAssets => {
@@ -434,13 +433,10 @@ figma.ui.onmessage = message => {
     // Show layer
     if (message.type === 'showLayer') {
         const layerId = message.id;
-        const page = getParentPageByLayerId(layerId);
-        if (page) {
-            figma.currentPage = page;
-            const layer = page.findOne(node => node.id === layerId);
-            figma.viewport.scrollAndZoomIntoView([layer]);
-            figma.currentPage.selection = [layer];
-        }
+        const layer = figma.getNodeById(layerId);
+        const page = getParentPage(layer);
+        figma.currentPage = page;
+        figma.viewport.scrollAndZoomIntoView([layer]);
     }
 
     // Notify
@@ -450,14 +446,15 @@ figma.ui.onmessage = message => {
 
 }
 
-function getParentPageByLayerId(id: string): PageNode {
-    for (let i = 0; i < figma.root.children.length; i++) {
-        const page = figma.root.children[i];
-        const haveLayer = page.findOne(node => node.id === id);
-        if (haveLayer) {
-            return page;
+function getParentPage(node: BaseNode): PageNode {
+    let parent = node.parent;
+    if (node.parent) {
+        while(parent && parent.type !== 'PAGE') {
+            parent = parent.parent;
         }
+        return parent as PageNode;
     }
+    return figma.currentPage;
 }
 
 function createFrameWithGrid(
