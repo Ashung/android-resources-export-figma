@@ -177,3 +177,16 @@ a:link, a:visited {
   flex: 1 1 100%;
   overflow-x: hidden;
 }
+
+.name-duplicated {
+  color: #F00;
+}
+.name-duplicated::after {
+  content: "*";
+}
+
+.setting-label {
+  display: block;
+  padding: 8px 8px 8px 16px;
+  color: rgba(0,0,0,0.6);
+}

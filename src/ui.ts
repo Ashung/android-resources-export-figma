@@ -39,6 +39,84 @@ window.onmessage = async (event) => {
         const assets = await getPNGAssetsFromPluginMessage(pluginMessage);
         createAssetsPreview(assets, true);
     }
+
+    // Setting
+    if (pluginMessage.type === 'settings') {
+        settings(pluginMessage.data);
+    }
+}
+
+function settings(dpis: [any]) {
+    const contentDiv = document.getElementById('content');
+    const footerDiv = document.getElementById('footer');
+    
+    const label = document.createElement('label');
+    label.className = 'setting-label type--11-pos';
+    label.textContent = 'Export dpis:';
+    contentDiv.appendChild(label);
+
+    const checkboxs: HTMLInputElement[] = [];
+    dpis.forEach((dpi, idx) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'export-item';
+        itemDiv.style.margin = '0';
+        contentDiv.appendChild(itemDiv);
+
+        const checkboxWrap = document.createElement('label');
+        checkboxWrap.className = 'export-item__checkbox';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'checkbox';
+        checkbox.id = 'dpi_' + idx;
+        checkbox.dataset.scale = String(dpi.scale);
+        checkbox.dataset.dpi = dpi.dpi;
+        if (dpi.active === true) {
+            checkbox.checked = true;
+        }
+        checkboxs.push(checkbox);
+        checkboxWrap.appendChild(checkbox);
+        itemDiv.appendChild(checkboxWrap);
+
+        const textWrap = document.createElement('div');
+        textWrap.className = 'type type--11-pos export-item__text';
+        const text = document.createElement('label');
+        text.textContent = dpi.dpi.toUpperCase() + ' (' + dpi.scale + 'x)';
+        text.setAttribute('for', 'dpi_' + idx);
+        textWrap.appendChild(text);
+        itemDiv.appendChild(textWrap);
+
+        checkbox.onclick = (event) => {
+            const target = event.target as HTMLInputElement;
+            const actives = checkboxs.map(item => item.checked);
+            if (actives.every(item => item === false)) {
+                target.checked = true;
+            }
+        };
+    });
+
+    const saveButton = document.createElement('button');
+    saveButton.className = 'button button--primary';
+    saveButton.textContent = 'Save';
+    footerDiv.style.justifyContent = 'flex-end';
+    footerDiv.appendChild(saveButton);
+
+    // Save button
+    saveButton.onclick = () => {
+        const settings = checkboxs.map(checkbox => {
+            return {
+                scale: parseFloat(checkbox.dataset.scale),
+                dpi: checkbox.dataset.dpi,
+                active: checkbox.checked
+            }
+        });
+        console.log(JSON.stringify(settings));
+        parent.postMessage({
+            pluginMessage: {
+                type: 'saveSettings',
+                data: settings
+            }
+        }, '*');
+    };
 }
 
 function createAssetsPreview(assets: {id: string, path: string, data?: Uint8Array, base64?: string}[], exportIcon?: boolean) {
@@ -74,8 +152,13 @@ function createAssetsPreview(assets: {id: string, path: string, data?: Uint8Arra
     footerDiv.appendChild(exportButton);
 
     let selectedCount = assetsCount;
+    const assetIds: string[] = [];
+    const assetNames: string[] = [];
     assets.forEach(item => {
-        if (/^(drawable|mipmap)-mdpi/.test(item.path) || item.path === 'playstore_icon.png') {
+        if (!assetIds.includes(item.id)) {
+            const assetName = item.path.replace(/^(drawable|mipmap)-(m|h|xh|xxh|xxxh)dpi\//, '');
+            assetIds.push(item.id);
+            
             const itemDiv = document.createElement('div');
             itemDiv.className = 'export-item';
             if (exportIcon) {
@@ -110,10 +193,15 @@ function createAssetsPreview(assets: {id: string, path: string, data?: Uint8Arra
             const textWrap = document.createElement('div');
             textWrap.className = 'type type--11-pos export-item__text';
             const text = document.createElement('label');
-            text.textContent = item.path.replace(/^(drawable|mipmap)-(m|h|xh|xxh|xxxh)dpi\//, '');
+            text.textContent = assetName;
             text.setAttribute('for', '_' + item.id);
             textWrap.appendChild(text);
             itemDiv.appendChild(textWrap);
+
+            if (assetNames.includes(assetName)) {
+                textWrap.classList.add('name-duplicated');
+            }
+            assetNames.push(assetName);
 
             if (!exportIcon) {
                 checkbox.addEventListener('change', () => {

@@ -3,12 +3,12 @@ const doc = figma.root;
 const currentPage = figma.currentPage;
 const selectedLayers = currentPage.selection;
 
-const exportOptions = [
-    {scale: 1, dir: 'drawable-mdpi/'},
-    {scale: 1.5, dir: 'drawable-hdpi/'},
-    {scale: 2, dir: 'drawable-xhdpi/'},
-    {scale: 3, dir: 'drawable-xxhdpi/'},
-    {scale: 4, dir: 'drawable-xxxhdpi/'},
+const dpis = [
+    {scale: 1, dpi: 'mdpi', active: false},
+    {scale: 1.5, dpi: 'hdpi', active: true},
+    {scale: 2, dpi: 'xhdpi', active: true},
+    {scale: 3, dpi: 'xxhdpi', active: true},
+    {scale: 4, dpi: 'xxxhdpi', active: true}
 ];
 
 if (command === 'new-png') {
@@ -96,18 +96,28 @@ if (command === 'export-png') {
     if (exportableLayers.length === 0) {
         figma.closePlugin('No exportable layers in document.');
     } else {
-        Promise.all(exportableLayers.map(layer => getExportImagesFromLayer(layer, exportOptions)))
-            .then(exportImages => {
-                const uiHeight = Math.min(exportableLayers.length * 48 + 16 + 48, 400);
-                figma.showUI(__html__, {width: 300, height: uiHeight});
-                figma.ui.postMessage({
-                    type: 'export-png',
-                    exportImages: exportImages
-                });
-            })
-            .catch(error => {
-                figma.closePlugin(error.message);
+        figma.clientStorage.getAsync('android_resources_export_settings').then(pluginSettings => {
+            const exportOptions = (pluginSettings || dpis).filter((item: any) => {
+                return item.active === true;
+            }).map((item: any) => {
+                return {
+                    scale: item.scale,
+                    dir: 'drawable-' + item.dpi + '/'
+                }
             });
+            Promise.all(exportableLayers.map(layer => getExportImagesFromLayer(layer, exportOptions)))
+                .then(exportImages => {
+                    const uiHeight = Math.min(exportableLayers.length * 48 + 16 + 48, 400);
+                    figma.showUI(__html__, {width: 300, height: uiHeight});
+                    figma.ui.postMessage({
+                        type: 'export-png',
+                        exportImages: exportImages
+                    });
+                })
+                .catch(error => {
+                    figma.closePlugin(error.message);
+                });
+        });
     }
 }
 
@@ -323,18 +333,28 @@ if (command === 'export-nine-patch') {
     if (ninePatchAssets.length === 0) {
         figma.closePlugin('No nine-patch asset in document.');
     } else {
-        Promise.all(ninePatchAssets.map(layer => getExportNinePatchFromLayer(layer, exportOptions)))
-            .then(exportNinePatchAssets => {
-                const uiHeight = Math.min(ninePatchAssets.length * 48 + 16 + 48, 400);
-                figma.showUI(__html__, {width: 300, height: uiHeight});
-                figma.ui.postMessage({
-                    type: 'export-nine-patch',
-                    exportImages: exportNinePatchAssets
-                });
-            })
-            .catch(error => {
-                figma.closePlugin(error.message);
+        figma.clientStorage.getAsync('android_resources_export_settings').then(pluginSettings => {
+            const exportOptions = (pluginSettings || dpis).filter((item: any) => {
+                return item.active === true;
+            }).map((item: any) => {
+                return {
+                    scale: item.scale,
+                    dir: 'drawable-' + item.dpi + '/'
+                }
             });
+            Promise.all(ninePatchAssets.map(layer => getExportNinePatchFromLayer(layer, exportOptions)))
+                .then(exportNinePatchAssets => {
+                    const uiHeight = Math.min(ninePatchAssets.length * 48 + 16 + 48, 400);
+                    figma.showUI(__html__, {width: 300, height: uiHeight});
+                    figma.ui.postMessage({
+                        type: 'export-nine-patch',
+                        exportImages: exportNinePatchAssets
+                    });
+                })
+                .catch(error => {
+                    figma.closePlugin(error.message);
+                });
+        });
     }
 }
 
@@ -344,13 +364,6 @@ if (command === 'new-app-icon') {
 }
 
 if (command === 'export-app-icon') {
-    const exportOptionsForIcon = [
-        {scale: 1, dir: 'mipmap-mdpi/'},
-        {scale: 1.5, dir: 'mipmap-hdpi/'},
-        {scale: 2, dir: 'mipmap-xhdpi/'},
-        {scale: 3, dir: 'mipmap-xxhdpi/'},
-        {scale: 4, dir: 'mipmap-xxxhdpi/'},
-    ];
     // Find app icon resources
     let oldIcon: BaseNode;
     let adaptiveIconBackground: BaseNode;
@@ -369,24 +382,38 @@ if (command === 'export-app-icon') {
         }
     });
     if (oldIcon && adaptiveIconBackground && adaptiveIconForeground) {
-        let tasks = [];
-        tasks.push(getExportImagesFromLayer(oldIcon, exportOptionsForIcon));
-        tasks.push(getExportImagesFromLayer(adaptiveIconBackground, exportOptionsForIcon));
-        tasks.push(getExportImagesFromLayer(adaptiveIconForeground, exportOptionsForIcon));
-        if (playStoreIcon) {
-            tasks.push(getExportImagesFromLayer(playStoreIcon, [{scale: 1, dir: ''}]));
-        }
-        Promise.all(tasks)
-            .then(exportImages => {
-                figma.showUI(__html__, {width: 300, height: 256});
-                figma.ui.postMessage({
-                    type: 'export-app-icon',
-                    exportImages: exportImages
-                });
-            })
-            .catch(error => {
-                figma.closePlugin(error.message);
+
+        figma.clientStorage.getAsync('android_resources_export_settings').then(pluginSettings => {
+            const exportOptionsForIcon = (pluginSettings || dpis).filter((item: any) => {
+                return item.active === true;
+            }).map((item: any) => {
+                return {
+                    scale: item.scale,
+                    dir: 'mipmap-' + item.dpi + '/'
+                }
             });
+
+            let tasks = [];
+            tasks.push(getExportImagesFromLayer(oldIcon, exportOptionsForIcon));
+            tasks.push(getExportImagesFromLayer(adaptiveIconBackground, exportOptionsForIcon));
+            tasks.push(getExportImagesFromLayer(adaptiveIconForeground, exportOptionsForIcon));
+            if (playStoreIcon) {
+                tasks.push(getExportImagesFromLayer(playStoreIcon, [{scale: 1, dir: ''}]));
+            }
+            Promise.all(tasks)
+                .then(exportImages => {
+                    figma.showUI(__html__, {width: 300, height: 256});
+                    figma.ui.postMessage({
+                        type: 'export-app-icon',
+                        exportImages: exportImages
+                    });
+                })
+                .catch(error => {
+                    figma.closePlugin(error.message);
+                });
+
+        });
+
     } else {
         let missFrames: string [] = [];
         if (!oldIcon) {
@@ -400,6 +427,16 @@ if (command === 'export-app-icon') {
         }
         figma.closePlugin('Can\'t find the frame named "' + missFrames.join(', ') + '".');
     }
+}
+
+if (command === 'settings') {
+    figma.clientStorage.getAsync('android_resources_export_settings').then(pluginSettings => {
+        figma.showUI(__html__, {width: 300, height: 300});
+        figma.ui.postMessage({
+            type: 'settings',
+            data: pluginSettings || dpis
+        });
+    });
 }
 
 figma.ui.onmessage = message => {
@@ -437,6 +474,7 @@ figma.ui.onmessage = message => {
         const page = getParentPage(layer);
         figma.currentPage = page;
         figma.viewport.scrollAndZoomIntoView([layer]);
+        page.selection = [layer as SceneNode];
     }
 
     // Notify
@@ -444,6 +482,12 @@ figma.ui.onmessage = message => {
         figma.notify(message.text);
     }
 
+    // Save Settings
+    if (message.type === 'saveSettings') {
+        figma.clientStorage.setAsync('android_resources_export_settings', message.data).then(() => {
+            figma.closePlugin();
+        });
+    }
 }
 
 function getParentPage(node: BaseNode): PageNode {
