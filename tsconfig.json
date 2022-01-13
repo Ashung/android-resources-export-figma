@@ -1,10 +1,13 @@
 {
     "compilerOptions": {
         "target": "es6",
-        "lib": ["es6", "dom", "es2017"],
-        "removeComments": true,
         "moduleResolution": "node",
         "resolveJsonModule": true,
-        "esModuleInterop": true
+        "esModuleInterop": true,
+        "removeComments": true,
+        "typeRoots": [
+            "./node_modules/@types",
+            "./node_modules/@figma"
+        ]
     }
 }
